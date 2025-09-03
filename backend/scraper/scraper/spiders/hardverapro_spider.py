@@ -1,13 +1,18 @@
 import scrapy
+from scraper.items import ScraperItem
 
-class LaptopSpider(scrapy.Spider):
-    name = "laptop"
+class HardverSpider(scrapy.Spider):
+    name = "hardver"
     start_urls = [
-        "https://hardverapro.hu/aprok/notebook/index.html",
+        "https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_30xx/index.html",
     ]
 
     def parse(self, response):
         listings = response.css('ul.list-unstyled > li[class]')
+
+        category_div = response.css("div.container > div > ol.breadcrumb")
+        category_text = category_div.xpath('string(.)').get()
+        category_text = category_text.replace("\t", " ").replace("\n", " ").replace("  ", " ").replace("  ", "/").strip()
         
         for listing in listings:
             data_uadid = listing.attrib.get('data-uadid')
@@ -29,6 +34,7 @@ class LaptopSpider(scrapy.Spider):
                     'data_uadid': data_uadid,
                     'iced_status': iced_status,
                     'price': price,
+                    'category': category_text,
                 }
             )
 
@@ -40,6 +46,7 @@ class LaptopSpider(scrapy.Spider):
         data_uadid = response.meta.get('data_uadid')
         iced_status = response.meta.get('iced_status')
         price = response.meta.get('price')
+        category = response.meta.get('category')
 
         title = response.css("head title::text").get()
         seller = response.css("td > b > a[style][href]::text").get()
@@ -50,18 +57,21 @@ class LaptopSpider(scrapy.Spider):
         description_div = response.css('div.uad-content div.rtif-content')
         description_text = description_div.xpath('string(.)').get()
 
+        scraper_item = ScraperItem()
 
-        yield {
-            'data_uadid': data_uadid,
-            'iced_status': iced_status,
-            'price': price,
-            'title': title,
-            'seller': seller,
-            'seller_profile_url': seller_profile_url_absolute,
-            'listed_at': listed_at,
-            'listing_url': response.url,
-            'description': description_text,
-        }
+        scraper_item['site'] = "hardverapro"
+        scraper_item['category'] = category
+        scraper_item['id'] = data_uadid
+        scraper_item['iced_status'] = iced_status
+        scraper_item['price'] = price
+        scraper_item['title'] = title
+        scraper_item['seller'] = seller
+        scraper_item['seller_profile_url'] = seller_profile_url_absolute
+        scraper_item['listed_at'] = listed_at
+        scraper_item['listing_url'] = response.url
+        scraper_item['description'] = description_text
+
+        yield ScraperItem
 
 
 # FEAT: if id is in a set, then only check attributes that are collected before the request
