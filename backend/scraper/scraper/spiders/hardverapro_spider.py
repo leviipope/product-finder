@@ -4,7 +4,8 @@ from scraper.items import ScraperItem
 class HardverSpider(scrapy.Spider):
     name = "hardver"
     start_urls = [
-        "https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_30xx/index.html",
+        #"https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_30xx/index.html",
+        "https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=210000&maxprice=211000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
     ]
 
     def parse(self, response):
@@ -64,6 +65,7 @@ class HardverSpider(scrapy.Spider):
         scraper_item['id'] = data_uadid
         scraper_item['iced_status'] = iced_status
         scraper_item['price'] = price
+        scraper_item['currency'] = "HUF"
         scraper_item['title'] = title
         scraper_item['seller'] = seller
         scraper_item['seller_profile_url'] = seller_profile_url_absolute
@@ -71,7 +73,7 @@ class HardverSpider(scrapy.Spider):
         scraper_item['listing_url'] = response.url
         scraper_item['description'] = description_text
 
-        yield ScraperItem
+        yield scraper_item
 
 
 # FEAT: if id is in a set, then only check attributes that are collected before the request

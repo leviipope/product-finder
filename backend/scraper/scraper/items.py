@@ -12,6 +12,7 @@ class ScraperItem(scrapy.Item):
     category = scrapy.Field()
     iced_status = scrapy.Field()
     price = scrapy.Field()
+    currency = scrapy.Field()
     title = scrapy.Field()
     seller = scrapy.Field()
     seller_profile_url = scrapy.Field()
