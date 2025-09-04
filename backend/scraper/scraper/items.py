@@ -14,6 +14,7 @@ class ScraperItem(scrapy.Item):
     price = scrapy.Field()
     currency = scrapy.Field()
     title = scrapy.Field()
+    img = scrapy.Field()
     seller = scrapy.Field()
     seller_rating = scrapy.Field()
     seller_profile_url = scrapy.Field()
@@ -22,3 +23,4 @@ class ScraperItem(scrapy.Item):
     listed_at = scrapy.Field()
     listing_url = scrapy.Field()
     description = scrapy.Field()
+    scraped_at = scrapy.Field()

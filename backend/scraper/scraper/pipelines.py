@@ -46,6 +46,12 @@ class ScraperPipeline:
                 if isinstance(category, str):
                     adapter['category'] = category.replace("/ ", "").strip().split("/")
 
+            if adapter.get('img'):
+                img = adapter.get('img')
+                if isinstance(img, str):
+                    if img.endswith("/100"):
+                        adapter['img'] = img[:-4]
+
 
 
         return item

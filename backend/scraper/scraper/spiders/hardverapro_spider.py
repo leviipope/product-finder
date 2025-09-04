@@ -1,5 +1,6 @@
 import scrapy
 from scraper.items import ScraperItem
+from datetime import datetime
 
 class HardverSpider(scrapy.Spider):
     name = "hardver"
@@ -27,6 +28,7 @@ class HardverSpider(scrapy.Spider):
             price = listing.css("div[class='uad-col uad-col-price'] span::text").get()
             if price == "Keresem":
                 continue
+            img = listing.css("div[class='uad-col uad-col-image'] > a > img::attr(src)").get()
 
             product_url = listing.css("div[class='uad-col uad-col-title'] > h1 > a::attr(href)").get()
 
@@ -38,6 +40,7 @@ class HardverSpider(scrapy.Spider):
                     'iced_status': iced_status,
                     'price': price,
                     'category': category_text,
+                    'img': img,
                 }
             )
 
@@ -49,6 +52,7 @@ class HardverSpider(scrapy.Spider):
         data_uadid = response.meta.get('data_uadid')
         iced_status = response.meta.get('iced_status')
         price = response.meta.get('price')
+        img = response.meta.get('img')
         category = response.meta.get('category')
 
         title = response.css('head title::text').get()
@@ -76,6 +80,7 @@ class HardverSpider(scrapy.Spider):
         scraper_item['id'] = data_uadid
         scraper_item['iced_status'] = iced_status
         scraper_item['price'] = price
+        scraper_item['img'] = img
         scraper_item['currency'] = "HUF"
         scraper_item['title'] = title
         scraper_item['seller'] = seller
@@ -86,6 +91,7 @@ class HardverSpider(scrapy.Spider):
         scraper_item['listed_at'] = listed_at
         scraper_item['listing_url'] = response.url
         scraper_item['description'] = description_text
+        scraper_item['scraped_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         yield scraper_item
 
