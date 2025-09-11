@@ -10,10 +10,18 @@
 # useful for handling different item types with a single interface
 from itemadapter import ItemAdapter
 from datetime import datetime
+from pathlib import Path
+import sys
+import json
+
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+import db
 
 
-class ScraperPipeline:
+class CleanDataPipeline:
     def process_item(self, item, spider):
+        print("\033[92mCleanDataPipeline: Processing item\033[0m")
         adapter = ItemAdapter(item)
 
         if adapter.get('id') is not None:
@@ -52,6 +60,41 @@ class ScraperPipeline:
                     if img.endswith("/100"):
                         adapter['img'] = img[:-4]
 
+        return item
+    
+class SQLitePipeline:
+    def __init__(self):
+        print("\033[94mSQLitePipeline: Initializing\033[0m")
+        db.create_listings_table() # to-be changed to a check-if-the-connection-is-okay function in the future
+        self.conn = db.get_connection()
+        self.cursor = self.conn.cursor()
 
+    def process_item(self, item, spider):
+        print("\033[94mSQLitePipeline: Processing item\033[0m")
+        adapter = ItemAdapter(item)
+        columns = []
+        placeholders = []
+        values = []
+
+        for field in adapter.keys():
+            columns.append(field)
+            placeholders.append("?")
+            value = adapter.get(field)
+            if isinstance(value, list):
+                value = json.dumps(value)
+            values.append(value)
+
+        query = f"INSERT OR REPLACE INTO listings ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
+        try:
+            self.cursor.execute(query, values)
+            self.conn.commit()
+            print("\033[92mSQLitePipeline: Item inserted successfully\033[0m")
+        except Exception as e:
+            print("\033[91mSQLitePipeline: Failed to insert Item\033[0m")
 
         return item
+    
+    def close_spider(self, spider):
+        print("\033[91mSQLitePipeline: Closing spider\033[0m")
+        self.conn.close()
+
