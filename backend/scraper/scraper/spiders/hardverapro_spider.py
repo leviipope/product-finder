@@ -11,9 +11,13 @@ class HardverSpider(scrapy.Spider):
         #"https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=210000&maxprice=211000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
     ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from backend.db import get_active_listing_ids
+        self.active_listings = get_active_listing_ids()
+
     def parse(self, response):
         listings = response.css('ul.list-unstyled > li[class]')
-
 
         category_div = response.css("div.container > div > ol.breadcrumb")
         category_text = category_div.xpath('string(.)').get().replace("\t", " ").replace("\n", " ").replace("  ", " ").replace("  ", "/").strip()
@@ -25,6 +29,15 @@ class HardverSpider(scrapy.Spider):
                 iced_status = True
             elif iced_status == "uad-price":
                 iced_status = False
+
+            if data_uadid in self.active_listings:
+                iced_status_in_db = self.active_listings[data_uadid]
+                if iced_status != iced_status_in_db:
+                    yield {
+                        'id': data_uadid,
+                        'iced_status': iced_status,
+                    }
+
             price = listing.css("div[class='uad-col uad-col-price'] span::text").get()
             if price == "Keresem":
                 continue
@@ -52,8 +65,9 @@ class HardverSpider(scrapy.Spider):
         data_uadid = response.meta.get('data_uadid')
         iced_status = response.meta.get('iced_status')
         price = response.meta.get('price')
-        img = response.meta.get('img')
         category = response.meta.get('category')
+        img = response.meta.get('img')
+
 
         title = response.css('head title::text').get()
         seller = response.css('td > b > a[style][href]::text').get()
@@ -94,7 +108,3 @@ class HardverSpider(scrapy.Spider):
         scraper_item['scraped_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         yield scraper_item
-
-
-# FEAT: if id is in a set, then only check attributes that are collected before the request
-# and do not send the request at all (dont go to product page)

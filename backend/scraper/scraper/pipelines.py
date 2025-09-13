@@ -71,9 +71,29 @@ class SQLitePipeline:
     def process_item(self, item, spider):
         print("\033[94mSQLitePipeline: Processing item\033[0m")
         adapter = ItemAdapter(item)
-        columns = []
-        placeholders = []
-        values = []
+
+        is_iced_update = (
+            adapter.get("id") is not None
+            and adapter.get("iced_status") is not None
+            and adapter.get("description") is None
+        )
+
+        if is_iced_update:
+            iced_status_int = 1 if adapter.get("iced_status") else 0
+            iced_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if iced_status_int else None
+            query = "UPDATE listings SET iced_status = ?, iced_at = ? WHERE id = ?"
+            values = [iced_status_int, iced_at, adapter["id"]]
+
+            try:
+                self.cursor.execute(query, values)
+                self.conn.commit()
+                print("\033[92mSQLitePipeline: Iced status updated successfully\033[0m")
+            except Exception as e:
+                print(f"\033[91mSQLitePipeline: Failed to update iced status: {e}\033[0m")
+
+            return item
+
+        columns, placeholders, values = [], [], []
 
         for field in adapter.keys():
             columns.append(field)

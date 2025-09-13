@@ -113,7 +113,7 @@ def get_connection():
         raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    get_all_listings()
+    print(get_active_listing_ids())
 
 
 if __name__ == "__main__":
