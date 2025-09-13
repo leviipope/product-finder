@@ -65,7 +65,6 @@ class CleanDataPipeline:
 class SQLitePipeline:
     def __init__(self):
         print("\033[94mSQLitePipeline: Initializing\033[0m")
-        db.create_listings_table() # to-be changed to a check-if-the-connection-is-okay function in the future
         self.conn = db.get_connection()
         self.cursor = self.conn.cursor()
 
@@ -81,8 +80,17 @@ class SQLitePipeline:
             placeholders.append("?")
             value = adapter.get(field)
             if isinstance(value, list):
-                value = json.dumps(value)
+                value = json.dumps(value, ensure_ascii=False)
             values.append(value)
+
+        category = adapter.get("category")
+        if isinstance(category, list) and len(category) > 1:
+            product_type = category[1]
+            columns.append("product_type")
+            placeholders.append("?")
+            values.append(product_type)
+        else:
+            pass
 
         query = f"INSERT OR REPLACE INTO listings ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
         try:
@@ -90,7 +98,7 @@ class SQLitePipeline:
             self.conn.commit()
             print("\033[92mSQLitePipeline: Item inserted successfully\033[0m")
         except Exception as e:
-            print("\033[91mSQLitePipeline: Failed to insert Item\033[0m")
+            print("\033[91mSQLitePipeline: Failed to insert Item: {e}\033[0m")
 
         return item
     

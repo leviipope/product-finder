@@ -1,6 +1,18 @@
 import sqlite3
+import os
 
 DATABASE_PATH = "/workspaces/product-finder/data/database.db"
+
+def get_active_listing_ids():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("SELECT id, iced_status FROM listings WHERE archived_at IS NULL")
+    results = c.fetchall()
+
+    conn.close()
+    return {str(row['id']): bool(row['iced_status']) for row in results}
+
 
 def get_all_listings():
     """Prints all listings in the table, but only prints attributes that have value"""
@@ -90,13 +102,19 @@ def create_listings_table():
     conn.close()
 
 def get_connection():
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        if not os.path.exists(DATABASE_PATH):
+            raise FileNotFoundError(f"\033[91mDatabase not found at {DATABASE_PATH}\033[0m")
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+    except sqlite3.Error as e:
+        raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    list_tables()
     get_all_listings()
+
 
 if __name__ == "__main__":
     main()
