@@ -21,8 +21,8 @@ import db
 
 class CleanDataPipeline:
     def process_item(self, item, spider):
-        print("\033[92mCleanDataPipeline: Processing item\033[0m")
         adapter = ItemAdapter(item)
+        print(f"\033[92mCleanDataPipeline: Processing item {adapter['id']}\033[0m")
 
         if adapter.get('id') is not None:
             adapter['id'] = int(adapter['id'])
@@ -69,8 +69,8 @@ class SQLitePipeline:
         self.cursor = self.conn.cursor()
 
     def process_item(self, item, spider):
-        print("\033[94mSQLitePipeline: Processing item\033[0m")
         adapter = ItemAdapter(item)
+        print(f"\033[94mSQLitePipeline: Processing item {adapter['id']}\033[0m")
 
         is_iced_update = (
             adapter.get("id") is not None
@@ -87,12 +87,12 @@ class SQLitePipeline:
             try:
                 self.cursor.execute(query, values)
                 self.conn.commit()
-                print("\033[92mSQLitePipeline: Iced status updated successfully\033[0m")
+                print(f"\033[38;5;153mSQLitePipeline: Iced status updated successfully {adapter['id']}\033[0m")
             except Exception as e:
-                print(f"\033[91mSQLitePipeline: Failed to update iced status: {e}\033[0m")
+                print(f"\033[91mSQLitePipeline: Failed to update iced status: {adapter['id']}, {e}\033[0m")
 
-            return item
-
+            return item    
+            
         columns, placeholders, values = [], [], []
 
         for field in adapter.keys():
@@ -112,17 +112,24 @@ class SQLitePipeline:
         else:
             pass
 
-        query = f"INSERT OR REPLACE INTO listings ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
+        query = f"INSERT INTO listings ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
         try:
             self.cursor.execute(query, values)
             self.conn.commit()
-            print("\033[92mSQLitePipeline: Item inserted successfully\033[0m")
+            print(f"\033[94mSQLitePipeline: Item {adapter['id']} inserted successfully\033[0m")
         except Exception as e:
-            print("\033[91mSQLitePipeline: Failed to insert Item: {e}\033[0m")
+            print(f"\033[91mSQLitePipeline: Failed to insert Item {adapter['id']}: {e}\033[0m")
 
         return item
     
     def close_spider(self, spider):
-        print("\033[91mSQLitePipeline: Closing spider\033[0m")
+        print(f"\033[38;5;217mClosing Spider...\033[0m")
+        missing_ids = set(spider.active_listings.keys()) - spider.seen_ids
+        archived_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for listing_id in missing_ids:
+            query = "UPDATE listings SET archived_at = ? WHERE id = ?"
+            self.cursor.execute(query, [archived_at, listing_id])
+            print(f"\033[38;5;218mArchived: {listing_id}\033[0m")
+        self.conn.commit()
         self.conn.close()
 

@@ -1,20 +1,32 @@
 import scrapy
 from scraper.items import ScraperItem
 from datetime import datetime
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).parent.parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from backend.db import get_active_listing_ids, get_connection
 
 class HardverSpider(scrapy.Spider):
     name = "hardver"
     start_urls = [
         #"https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_30xx/index.html",
         #"https://hardverapro.hu/index.html",
+        #'https://hardverapro.hu/aprok/notebook/index.html'
         "https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=210000&maxprice=211000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
         #"https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=210000&maxprice=211000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
     ]
 
+    custom_settings = {
+        'DOWNLOAD_DELAY': 1,
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from backend.db import get_active_listing_ids
         self.active_listings = get_active_listing_ids()
+        self.seen_ids = set()
 
     def parse(self, response):
         listings = response.css('ul.list-unstyled > li[class]')
@@ -24,6 +36,7 @@ class HardverSpider(scrapy.Spider):
 
         for listing in listings:
             data_uadid = listing.attrib.get('data-uadid')
+            self.seen_ids.add(data_uadid)
             iced_status = listing.css("div[class='uad-col uad-col-price'] div::attr(class)").get()
             if iced_status == "uad-price uad-price-iced":
                 iced_status = True
@@ -33,10 +46,15 @@ class HardverSpider(scrapy.Spider):
             if data_uadid in self.active_listings:
                 iced_status_in_db = self.active_listings[data_uadid]
                 if iced_status != iced_status_in_db:
+                    print(f"\033[38;5;153mSending item as iced item: {data_uadid}\033[0m")
                     yield {
                         'id': data_uadid,
                         'iced_status': iced_status,
                     }
+                else:
+                    print(f"\033[38;5;215mSkipped because duplicate: {data_uadid} (this item will not go to any pipeline)\033[0m")
+                
+                continue
 
             price = listing.css("div[class='uad-col uad-col-price'] span::text").get()
             if price == "Keresem":

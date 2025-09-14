@@ -37,20 +37,14 @@ def get_all_listings():
 
     conn.close()
 
-def add_demo_listing():
+def excecute_sql(sql):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute("INSERT INTO listings (site, id) VALUES ('test site', 430)")
-
-    conn.commit()
-    conn.close()
-
-def delete_all_listings():
-    conn = get_connection()
-    c = conn.cursor()
-
-    c.execute("DELETE FROM listings")
+    if isinstance(sql, str):
+        c.execute(sql)
+    else:
+        print("SQL code has to be string")
 
     conn.commit()
     conn.close()
@@ -113,7 +107,7 @@ def get_connection():
         raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    print(get_active_listing_ids())
+    excecute_sql("INSERT INTO listings (id) VALUES (0)")
 
 
 if __name__ == "__main__":
