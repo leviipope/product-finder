@@ -13,6 +13,33 @@ def get_active_listing_ids():
     conn.close()
     return {str(row['id']): bool(row['iced_status']) for row in results}
 
+def get_latest_price(id):
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute(f"SELECT price FROM listings WHERE id = {id}")
+    row = c.fetchone()
+
+    if row:
+        price = int(row['price'])
+
+    conn.close()
+
+    return price
+
+def get_iced_status(id):
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute(f"SELECT iced_status FROM listings WHERE id = {id}")
+    row = c.fetchone()
+
+    if row:
+        iced_status = bool(row['iced_status'])
+
+    conn.close()
+
+    return iced_status
 
 def get_all_listings():
     """Prints all listings in the table, but only prints attributes that have value"""
@@ -77,6 +104,7 @@ def create_listings_table():
             iced_at DATE,
             archived_at DATE,
             price INT,
+            price_history TEXT,
             currency TEXT,
             img TEXT,
             seller TEXT,
@@ -107,7 +135,7 @@ def get_connection():
         raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    excecute_sql("INSERT INTO listings (id) VALUES (0)")
+    excecute_sql("UPDATE listings SET price = '999' WHERE id = '7117675'")
 
 
 if __name__ == "__main__":

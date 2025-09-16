@@ -7,7 +7,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from backend.db import get_active_listing_ids, get_connection
+from backend.db import get_active_listing_ids, get_latest_price
 
 class HardverSpider(scrapy.Spider):
     name = "hardver"
@@ -16,7 +16,6 @@ class HardverSpider(scrapy.Spider):
         #"https://hardverapro.hu/index.html",
         #'https://hardverapro.hu/aprok/notebook/index.html'
         "https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=210000&maxprice=211000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
-        #"https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=210000&maxprice=211000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
     ]
 
     custom_settings = {
@@ -31,36 +30,42 @@ class HardverSpider(scrapy.Spider):
     def parse(self, response):
         listings = response.css('ul.list-unstyled > li[class]')
 
-        category_div = response.css("div.container > div > ol.breadcrumb")
-        category_text = category_div.xpath('string(.)').get().replace("\t", " ").replace("\n", " ").replace("  ", " ").replace("  ", "/").strip()
-
         for listing in listings:
             data_uadid = listing.attrib.get('data-uadid')
             self.seen_ids.add(data_uadid)
+
             iced_status = listing.css("div[class='uad-col uad-col-price'] div::attr(class)").get()
             if iced_status == "uad-price uad-price-iced":
                 iced_status = True
             elif iced_status == "uad-price":
                 iced_status = False
 
+            price = listing.css("div[class='uad-col uad-col-price'] span::text").get()
+            if price == "Keresem":
+                continue
+
             if data_uadid in self.active_listings:
+                current_price = int(price.replace(' ', '').replace('Ft', '').strip())
+
+                latest_price_in_db = get_latest_price(data_uadid)
                 iced_status_in_db = self.active_listings[data_uadid]
-                if iced_status != iced_status_in_db:
-                    print(f"\033[38;5;153mSending item as iced item: {data_uadid}\033[0m")
+
+                price_changed = current_price != latest_price_in_db
+                iced_status_changed = iced_status != iced_status_in_db
+
+                if price_changed or iced_status_changed:
+                    print(f"\033[38;5;153mSending item as iced item or price update item: {data_uadid}\033[0m")
                     yield {
                         'id': data_uadid,
                         'iced_status': iced_status,
+                        'price': price,
                     }
                 else:
                     print(f"\033[38;5;215mSkipped because duplicate: {data_uadid} (this item will not go to any pipeline)\033[0m")
                 
                 continue
 
-            price = listing.css("div[class='uad-col uad-col-price'] span::text").get()
-            if price == "Keresem":
-                continue
             img = listing.css("div[class='uad-col uad-col-image'] > a > img::attr(src)").get()
-
             product_url = listing.css("div[class='uad-col uad-col-title'] > h1 > a::attr(href)").get()
 
             yield response.follow(
@@ -70,7 +75,6 @@ class HardverSpider(scrapy.Spider):
                     'data_uadid': data_uadid,
                     'iced_status': iced_status,
                     'price': price,
-                    'category': category_text,
                     'img': img,
                 }
             )
@@ -83,11 +87,12 @@ class HardverSpider(scrapy.Spider):
         data_uadid = response.meta.get('data_uadid')
         iced_status = response.meta.get('iced_status')
         price = response.meta.get('price')
-        category = response.meta.get('category')
         img = response.meta.get('img')
 
-
         title = response.css('head title::text').get()
+        category_div = response.css("div.container > div > ol.breadcrumb")
+        category_text = category_div.xpath('string(.)').get().replace("\t", " ").replace("\n", " ").replace("  ", " ").replace("  ", "/").strip()
+
         seller = response.css('td > b > a[style][href]::text').get()
         seller_profile_url_relativ = response.css('td > b > a[style][href]::attr(href)').get()
         seller_profile_url_absolute = response.urljoin(seller_profile_url_relativ)
@@ -108,7 +113,7 @@ class HardverSpider(scrapy.Spider):
         scraper_item = ScraperItem()
 
         scraper_item['site'] = "HardverApró"
-        scraper_item['category'] = category
+        scraper_item['category'] = category_text
         scraper_item['id'] = data_uadid
         scraper_item['iced_status'] = iced_status
         scraper_item['price'] = price
