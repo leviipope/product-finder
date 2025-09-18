@@ -1,7 +1,11 @@
 import sqlite3
 import os
+from pathlib import Path
 
-DATABASE_PATH = "/workspaces/product-finder/data/database.db"
+db_path1 = Path("data/database.db")
+db_path2 = Path("/workspaces/product-finder/data/database.db")
+
+DATABASE_PATH = db_path1 if db_path1.exists() else db_path2
 
 def get_active_listing_ids():
     conn = get_connection()
@@ -12,6 +16,19 @@ def get_active_listing_ids():
 
     conn.close()
     return {str(row['id']): bool(row['iced_status']) for row in results}
+
+def get_non_enriched_listings():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("SELECT id FROM listings WHERE enriched_brand IS NULL")
+    results = c.fetchall()
+
+    conn.close()
+
+    ids = [row['id'] for row in results]
+
+    return ids
 
 def get_latest_price(id):
     conn = get_connection()
@@ -40,6 +57,24 @@ def get_iced_status(id):
     conn.close()
 
     return iced_status
+
+def get_prompt(id):
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute(f"SELECT title, description FROM listings WHERE id = {id}")
+
+    row = c.fetchone()
+    title, description = row
+
+    prompt = f"""
+Title = {title}
+Description = {description}
+"""
+
+    conn.close()
+
+    return prompt
 
 def get_all_listings():
     """Prints all listings in the table, but only prints attributes that have value"""
@@ -135,8 +170,7 @@ def get_connection():
         raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    excecute_sql("UPDATE listings SET price = '999' WHERE id = '7117675'")
-
+    print(get_non_enriched_listings())
 
 if __name__ == "__main__":
     main()
