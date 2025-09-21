@@ -1,4 +1,6 @@
 scrapy-tutorial/
+ssh*
+droplet_control_deprecated.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
