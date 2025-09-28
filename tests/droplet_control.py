@@ -43,7 +43,7 @@ def create_droplet():
     print(f"Created Droplet '{DROPLET_NAME}' with ID {droplet_id}")
     status, ip = get_status(droplet_id)
     print("Initializing Droplet...")
-    time.sleep(45)
+    time.sleep(65)
     while True:
         status, ip = check_status(droplet_id)
         if ip != "No IP yet":
@@ -72,7 +72,7 @@ def get_status(droplet_id):
     return status, ip
 
 if __name__ == "__main__":
-    action = input("Enter action (create/delete/status/list): ").strip().lower()
+    action = input("Enter action (create/delete/status/list/other): ").strip().lower()
 
     if action == "create":
         droplet_id = create_droplet()
@@ -88,8 +88,25 @@ if __name__ == "__main__":
 
     elif action == "list":
         client = Client(token=DO_API_TOKEN) # type: ignore
-        resp = client.droplets.list()
-        print(resp)
+        response = client.droplets.list()
+        droplets = response.get("droplets", [])
+        if len(droplets) != 0:
+            for droplet in droplets:
+                print(f"ID: {droplet['id']}\nName: {droplet['name']}")
+        else:
+            print("No droplets.")
+
+    elif action == "other":
+        other_action = input("Enter action (ssh): ").strip().lower()
+
+        if other_action == "ssh":
+            client = Client(token=DO_API_TOKEN) # type: ignore
+            response = client.ssh_keys.list()
+            keys = response.get("ssh_keys", [])
+            [print(f"ID: {k['id']}\nFingerprint: {k['fingerprint']}\nName: {k['name']}\n") for k in keys]
+
+        else:
+            print("Invalid action. Use 'ssh'")
 
     else:
-        print("Invalid action. Use 'create', 'delete', 'status' or 'list'.")
+        print("Invalid action. Use 'create', 'delete', 'status', 'list' or 'other'.")

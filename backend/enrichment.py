@@ -51,7 +51,7 @@ def enrich_listing(id: int, data: dict):
 
     print(f"✅ Listing {id} enriched, updated in database")
 
-def main():
+def local_enrichment():
     MAX_RETRIES = 3
     non_enriched_listing_ids = get_non_enriched_listings()
     start_total = time.time()
@@ -85,4 +85,4 @@ def main():
     print(f"\n🏁 Total runtime: {elapsed_total:.2f}s")
 
 if __name__ == "__main__":
-    main()
+    local_enrichment()
