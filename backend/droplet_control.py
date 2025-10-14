@@ -43,7 +43,7 @@ def create_droplet():
     droplet_response = client.droplets.create(body=body)
     droplet_id = droplet_response["droplet"]["id"]
     print(f"Created Droplet '{DROPLET_NAME}' with ID {droplet_id}")
-    status, ip = get_status(droplet_id)
+    status, ip = get_status(droplet_id, print_bool=False)
     print("Initializing Droplet...")
     loading_bar(total=60, duration=65)
     while True:
@@ -66,11 +66,12 @@ def check_status(droplet_id):
     ip = droplet["droplet"]["networks"]["v4"][0]["ip_address"] if droplet["droplet"]["networks"]["v4"] else "No IP yet"
     return status, ip
 
-def get_status(droplet_id):
+def get_status(droplet_id, print_bool=True):
     droplet = client.droplets.get(droplet_id)
     status = droplet["droplet"]["status"]
     ip = droplet["droplet"]["networks"]["v4"][0]["ip_address"] if droplet["droplet"]["networks"]["v4"] else "No IP yet"
-    print(f"Droplet status: {status}, IP: {ip}")
+    if print_bool:
+        print(f"Droplet status: {status}, IP: {ip}")
     return status, ip
 
 def list_snapshots():
