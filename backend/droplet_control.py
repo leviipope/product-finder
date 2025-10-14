@@ -3,6 +3,7 @@ import time
 import os
 from dotenv import load_dotenv
 from pydo import Client
+from utils import loading_bar
 
 # ---------------- CONFIG ----------------
 load_dotenv()
@@ -44,7 +45,7 @@ def create_droplet():
     print(f"Created Droplet '{DROPLET_NAME}' with ID {droplet_id}")
     status, ip = get_status(droplet_id)
     print("Initializing Droplet...")
-    time.sleep(65)
+    loading_bar(total=60, duration=65)
     while True:
         status, ip = check_status(droplet_id)
         if ip != "No IP yet":
@@ -72,6 +73,12 @@ def get_status(droplet_id):
     print(f"Droplet status: {status}, IP: {ip}")
     return status, ip
 
+def list_snapshots():
+    resp = client.snapshots.list(per_page=50)
+
+    for snap in resp["snapshots"]:
+        print(f"ID: {snap['id']}, Name: {snap['name']}, Resource: {snap['resource_type']}, Created: {snap['created_at']}")
+
 if __name__ == "__main__":
     action = input("Enter action (create/delete/status/list/other): ").strip().lower()
 
@@ -98,7 +105,7 @@ if __name__ == "__main__":
             print("No droplets.")
 
     elif action == "other":
-        other_action = input("Enter action (ssh): ").strip().lower()
+        other_action = input("Enter action (ssh/snapshots): ").strip().lower()
 
         if other_action == "ssh":
             client = Client(token=DO_API_TOKEN) # type: ignore
@@ -106,6 +113,8 @@ if __name__ == "__main__":
             keys = response.get("ssh_keys", [])
             [print(f"ID: {k['id']}\nFingerprint: {k['fingerprint']}\nName: {k['name']}\n") for k in keys]
 
+        elif other_action == "snapshots":
+            list_snapshots()
         else:
             print("Invalid action. Use 'ssh'")
 
