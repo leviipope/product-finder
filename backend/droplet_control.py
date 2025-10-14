@@ -42,14 +42,14 @@ def create_droplet():
     }
     droplet_response = client.droplets.create(body=body)
     droplet_id = droplet_response["droplet"]["id"]
-    print(f"Created Droplet '{DROPLET_NAME}' with ID {droplet_id}")
+    print(f"Created Droplet '{DROPLET_NAME}' with ID \033[92m{droplet_id}\033[0m")
     status, ip = get_status(droplet_id, print_bool=False)
     print("Initializing Droplet...")
     loading_bar(total=60, duration=65)
     while True:
         status, ip = check_status(droplet_id)
         if ip != "No IP yet":
-            print(f"Droplet {droplet_id} is ready to use, status: {status}! IP: {ip}")
+            print(f"Droplet \033[92m{droplet_id}\033[0m is ready to use, status: {status}! IP: \033[38;5;51m{ip}\033[0m")
             break
         print("Waiting for droplet to become active...")
         time.sleep(7)
@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
     if action == "create":
         droplet_id = create_droplet()
-        print(f"Save this Droplet ID for later: {droplet_id}")
+        print(f"Save this Droplet ID for later: \033[38;5;51m{droplet_id}\033[0m")
 
     elif action == "delete":
         droplet_id = input("Enter Droplet ID to delete: ").strip()
