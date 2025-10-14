@@ -9,7 +9,8 @@ load_dotenv()
 DO_API_TOKEN = os.getenv("DO_API_TOKEN")
 DROPLET_NAME = "LLM-JSON-parser"
 REGION = "tor1"
-SIZE = "gpu-l40sx1-48gb"
+# SIZE = "gpu-l40sx1-48gb" # currently not available in tor1
+SIZE = "gpu-6000adax1-48gb"
 IMAGE_ID = os.getenv("IMAGE_ID")
 SSH_KEY_ID = os.getenv("SSH_KEY_ID")
 SSH_KEY_FINGERPRINT = os.getenv("SSH_KEY_FINGERPRINT")
