@@ -5,7 +5,7 @@ import time
 
 ollama = ollama.Client()
 
-def run_ollama(prompt: str, model="laptopparser") -> str:
+def run_ollama(prompt: str, model="laptop-parser") -> str:
     response = ollama.generate(model=model, prompt=prompt)
 
     return response.response
@@ -66,8 +66,8 @@ def local_enrichment():
                 llm_output = parse_listing(id)
                 cleaned_output = clean_output(llm_output)
                 data = load_json(cleaned_output)
-                # output_to_json(data, id)
-                enrich_listing(id, data)
+                output_to_json(data, id)
+                # enrich_listing(id, data)
 
                 elapsed_attempt = time.time() - start_attempt
                 print(f"✅ Attempt {attempt} succeeded in {elapsed_attempt:.2f}s")
