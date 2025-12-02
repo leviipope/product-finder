@@ -2,10 +2,10 @@ import sqlite3
 import os
 from pathlib import Path
 
-db_path1 = Path("data/database.db")
-db_path2 = Path("/workspaces/product-finder/data/database.db")
-
-DATABASE_PATH = db_path1 if db_path1.exists() else db_path2
+base_dir = Path(__file__).parent.parent
+db_path = base_dir / "data" / "database.db"
+db_path = os.path.abspath(db_path)
+DATABASE_PATH = db_path
 
 def get_active_listing_ids():
     conn = get_connection()
@@ -21,7 +21,10 @@ def get_non_enriched_listings():
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute("SELECT id FROM listings WHERE enriched_brand IS NULL")
+    c.execute("""
+        SELECT id FROM listings 
+        WHERE id NOT IN (SELECT listing_id FROM enriched_specs_laptops)
+    """)
     results = c.fetchall()
 
     conn.close()
@@ -37,12 +40,12 @@ def get_latest_price(id):
     c.execute(f"SELECT price FROM listings WHERE id = {id}")
     row = c.fetchone()
 
-    if row:
-        price = int(row['price'])
-
     conn.close()
 
-    return price
+    if row is None:
+        return None
+
+    return int(row[0])
 
 def get_iced_status(id):
     conn = get_connection()
@@ -51,21 +54,21 @@ def get_iced_status(id):
     c.execute(f"SELECT iced_status FROM listings WHERE id = {id}")
     row = c.fetchone()
 
-    if row:
-        iced_status = bool(row['iced_status'])
-
     conn.close()
 
-    return iced_status
+    if row is None:
+        return None
+
+    return bool(row[0])
 
 def get_prompt(id):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute(f"SELECT title, description FROM listings WHERE id = {id}")
+    c.execute(f"SELECT title, site, description FROM listings WHERE id = {id}")
 
     row = c.fetchone()
-    title, description = row
+    title, site, description = row
 
     prompt = f"""
 Title = {title}
@@ -74,7 +77,7 @@ Description = {description}
 
     conn.close()
 
-    return prompt
+    return prompt, site
 
 def get_all_listings():
     """Prints all listings in the table, but only prints attributes that have value"""
@@ -99,7 +102,7 @@ def get_all_listings():
 
     conn.close()
 
-def excecute_sql(sql):
+def execute_sql(sql):
     conn = get_connection()
     c = conn.cursor()
 
@@ -132,9 +135,6 @@ def create_listings_table():
             title TEXT,
             category TEXT,
             product_type TEXT,
-            enriched_model TEXT,
-            enriched_brand TEXT,
-            enriched_specs TEXT,
             iced_status BOOLEAN,
             iced_at DATE,
             archived_at DATE,
@@ -151,12 +151,43 @@ def create_listings_table():
             listing_url TEXT,
             description TEXT,
             scraped_at DATE,
+              
             PRIMARY KEY (site, id)
         )
     ''')
 
     conn.commit()
     conn.close()
+
+def create_enriched_specs_laptops_table():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS enriched_specs_laptops (
+            site TEXT NOT NULL,
+            listing_id INT NOT NULL,
+            enriched_model TEXT,
+            enriched_brand TEXT,
+            resolution TEXT,
+            screen_size TEXT,
+            panel_type TEXT,
+            refresh_rate TEXT,
+            cpu_brand TEXT,
+            cpu_model TEXT,
+            gpu_brand TEXT,
+            gpu_model TEXT,
+            gpu_type TEXT,
+            ram TEXT,
+            storage_size TEXT,
+            storage_type TEXT,
+            
+            PRIMARY KEY (site, listing_id),
+            FOREIGN KEY (site, listing_id) 
+                REFERENCES listings(site, id)
+                ON DELETE CASCADE
+        )
+    ''')
 
 def get_connection():
     try:
@@ -170,7 +201,7 @@ def get_connection():
         raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    print(get_non_enriched_listings())
+    execute_sql("DELETE FROM enriched_specs_laptops")
 
 if __name__ == "__main__":
     main()
