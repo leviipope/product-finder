@@ -65,10 +65,10 @@ def get_prompt(id):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute(f"SELECT title, description FROM listings WHERE id = {id}")
+    c.execute(f"SELECT title, site, description FROM listings WHERE id = {id}")
 
     row = c.fetchone()
-    title, description = row
+    title, site, description = row
 
     prompt = f"""
 Title = {title}
@@ -77,7 +77,7 @@ Description = {description}
 
     conn.close()
 
-    return prompt
+    return prompt, site
 
 def get_all_listings():
     """Prints all listings in the table, but only prints attributes that have value"""
@@ -102,7 +102,7 @@ def get_all_listings():
 
     conn.close()
 
-def excecute_sql(sql):
+def execute_sql(sql):
     conn = get_connection()
     c = conn.cursor()
 
@@ -201,7 +201,7 @@ def get_connection():
         raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    print(get_prompt(7285493))
+    execute_sql("DELETE FROM enriched_specs_laptops")
 
 if __name__ == "__main__":
     main()

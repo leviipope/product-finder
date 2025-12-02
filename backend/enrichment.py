@@ -1,17 +1,60 @@
 import json
 import ollama
-from db import get_prompt, get_connection, get_non_enriched_listings
 import time
+from pydantic import BaseModel, Field
+from typing import Literal, Union
+from db import get_prompt, get_connection, get_non_enriched_listings
 
-ollama = ollama.Client()
+class LaptopSpecs(BaseModel):
+    brand: str
+    model: str
+    
+    resolution: Union[Literal['FHD', 'FHD+', 'QHD', 'QHD+', '4k', 'Other', None], None] = Field(
+        description="No other text or marketing terms allowed. If unknown, use null."
+    )
+    
+    screen_size_inches: Union[float, None] = Field(
+        description="Diagonal screen size in inches (e.g., 15.6, 13.3). Return as a clean number. Use null if unknown."
+    )
+    
+    panel_type: Union[Literal['IPS', 'OLED', 'TN', 'VA'], None] = Field(
+        description="Screen panel technology. Must be one of: 'IPS', 'OLED', 'TN', 'VA'. Use null if unknown."
+    )
+    
+    refresh_rate: Union[float, None] = Field( 
+        description="Screen refresh rate in Hz (e.g., 144.0, 60.0). Return as a clean float. Use null if unknown."
+    )
+    
+    cpu_brand: str
+    cpu_model: str
+    
+    gpu_brand: Union[Literal['NVIDIA', 'AMD', 'Intel'], None] = Field(description="Brand of the GPU (e.g., 'NVIDIA', 'AMD', 'Intel'). Use null if unknown.")
+    gpu_model: Union[str, None] = Field(description="Model of the GPU (e.g., 'RTX 4070', 'Radeon 780M'). Use null if unknown, don't use 'integrated'.")
+    
+    gpu_type: Union[Literal['Dedicated', 'Integrated'], None] = Field(
+        description="Must be either 'Dedicated' or 'Integrated'. Use null if unknown."
+    )
+    
+    ram_gb: Union[int, None] = Field(
+        description="Total RAM size in GB (e.g., 16, 32). Return as a clean integer. Use null if unknown."
+    )
+    
+    storage_size_gb: Union[int, None] = Field(
+        description="Total storage capacity (summed) in GB (e.g., 512, 1256). Return as a clean integer. Use null if unknown."
+    )
+
+    storage_type: Union[Literal['SSD', 'HDD', 'Hybrid'], None] = Field(
+        description="Type of storage(s). Use null if unknown."
+    )
 
 def run_ollama(prompt: str, model="laptop-parser") -> str:
-    response = ollama.generate(model=model, prompt=prompt)
+    response = ollama.chat(model=model, messages=[{'role': 'user', 'content': prompt}], format=LaptopSpecs.model_json_schema())
 
-    return response.response
+    return response['message']['content']
 
 def parse_listing(id: int): 
-    return run_ollama(get_prompt(id))
+    prompt, site = get_prompt(id)
+    return run_ollama(prompt), site
 
 def clean_output(llm_output: str) -> str:
     cleaned_output = llm_output.strip("` \n")
@@ -21,29 +64,43 @@ def clean_output(llm_output: str) -> str:
 def load_json(cleaned_output: str):
     return json.loads(cleaned_output)
           
-def output_to_json(data, id):
-    output_file = f"parsed_listing_{id}.json"
-    with open(output_file, "w", encoding="utf-8") as f:
+def output_to_json(data):
+    output_file = f"parsed_listings.json"
+    with open(output_file, "a", encoding="utf-8") as f:
+        f.write("\n")
         json.dump(data, f, indent=4, ensure_ascii=False)
     print(f"Data written to {output_file}")
 
-def enrich_listing(id: int, data: dict):
-    enriched_brand = data.get("enriched_brand")
-    enriched_model = data.get("enriched_model")
-    enriched_specs = json.dumps(data.get("enriched_specs", {}), ensure_ascii=False)
+def enrich_listing(id: int, site: str, data: dict):
+    brand = data.get("brand")
+    model = data.get("model")
+    resolution = data.get("resolution")
+    screen_size_inches = data.get("screen_size_inches")
+    panel_type = data.get("panel_type")
+    refresh_rate = data.get("refresh_rate")
+    cpu_brand = data.get("cpu_brand")
+    cpu_model = data.get("cpu_model")
+    gpu_brand = data.get("gpu_brand")
+    gpu_model = data.get("gpu_model")
+    gpu_type = data.get("gpu_type")
+    ram_gb = data.get("ram_gb")
+    storage_size_gb = data.get("storage_size_gb")
+    storage_type = data.get("storage_type")
 
     conn = get_connection()
     c = conn.cursor()
 
     c.execute(
         '''
-        UPDATE listings
-        SET enriched_brand = ?,
-            enriched_model = ?,
-            enriched_specs = ?
-        WHERE id = ?
+        INSERT INTO enriched_specs_laptops (
+            site, listing_id, enriched_brand, enriched_model, resolution, screen_size, panel_type, refresh_rate,
+            cpu_brand, cpu_model, gpu_brand, gpu_model, gpu_type, ram, storage_size, storage_type
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',
-        (enriched_brand, enriched_model, enriched_specs, id),
+        (
+            site, id, brand, model, resolution, screen_size_inches, panel_type, refresh_rate,
+            cpu_brand, cpu_model, gpu_brand, gpu_model, gpu_type, ram_gb, storage_size_gb, storage_type
+        )
     )
 
     conn.commit()
@@ -63,11 +120,11 @@ def local_enrichment():
         for attempt in range(1, MAX_RETRIES + 1):
             start_attempt = time.time()
             try:
-                llm_output = parse_listing(id)
+                llm_output, site = parse_listing(id)
                 cleaned_output = clean_output(llm_output)
                 data = load_json(cleaned_output)
-                output_to_json(data, id)
-                # enrich_listing(id, data)
+                # output_to_json(data)
+                enrich_listing(id, site, data)
 
                 elapsed_attempt = time.time() - start_attempt
                 print(f"✅ Attempt {attempt} succeeded in {elapsed_attempt:.2f}s")
