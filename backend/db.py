@@ -189,6 +189,19 @@ def create_enriched_specs_laptops_table():
         )
     ''')
 
+def create_searches_table():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS searches(
+            email TEXT NOT NULL,
+            category TEXT NOT NULL,
+            filters TEXT NOT NULL,
+            is_active BOOLEAN
+        )
+    ''')
+
 def get_connection():
     try:
         if not os.path.exists(DATABASE_PATH):
@@ -201,7 +214,7 @@ def get_connection():
         raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    execute_sql("DELETE FROM enriched_specs_laptops")
+    pass
 
 if __name__ == "__main__":
     main()
