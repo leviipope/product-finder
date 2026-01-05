@@ -1,9 +1,8 @@
-import requests
+import sys
 import time
 import os
 from dotenv import load_dotenv
 from pydo import Client
-from utils import loading_bar
 
 # ---------------- CONFIG ----------------
 load_dotenv()
@@ -79,6 +78,15 @@ def list_snapshots():
 
     for snap in resp["snapshots"]:
         print(f"ID: {snap['id']}, Name: {snap['name']}, Resource: {snap['resource_type']}, Created: {snap['created_at']}")
+
+def loading_bar(total, duration):
+    for i in range(total + 1):
+        percent = (i / total) * 100
+        bar = "█" * i + "-" * (total - i)
+        sys.stdout.write(f"\r[{bar}] {percent:6.2f}%")
+        sys.stdout.flush()
+        time.sleep(duration / total)
+    sys.stdout.write("\n")
 
 if __name__ == "__main__":
     action = input("Enter action (create/delete/status/list/other): ").strip().lower()
