@@ -195,6 +195,7 @@ def create_searches_table():
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS searches(
+            search_id INTEGER PRIMARY KEY,
             email TEXT NOT NULL,
             category TEXT NOT NULL,
             filters TEXT NOT NULL,
@@ -211,10 +212,10 @@ def get_connection():
         conn.row_factory = sqlite3.Row
         return conn
     except sqlite3.Error as e:
-        raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
+        raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    pass
+    create_searches_table()
 
 if __name__ == "__main__":
     main()
