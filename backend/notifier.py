@@ -1,10 +1,120 @@
 import json
 import sqlite3
 from typing import Callable, Any
-from db import get_connection
+from db import get_connection, get_non_enriched_listings
 
-def run_laptop_notifier():
+def send_notification(email, laptop, search_id):
     pass
+
+def run_laptop_notifier(new_laptop_ids):
+    # tmp laptop ids for testing
+    new_laptop_ids = [7263145, 7274904, 7276182]
+
+    with get_connection() as conn:
+        c = conn.cursor()
+
+        placeholders = ', '.join(['?'] * len(new_laptop_ids))
+
+        query = f"SELECT * FROM enriched_specs_laptops WHERE listing_id IN ({placeholders})"
+
+        query = f"""
+            SELECT 
+                l.site,
+                l.id,
+                l.price,
+                l.title,
+                l.iced_status,
+                l.price,
+                l.currency,
+                l.location,
+                l.listed_at,
+                l.listing_url,
+                e.enriched_model,
+                e.enriched_brand,
+                e.screen_size,
+                e.panel_type,
+                e.refresh_rate,
+                e.cpu_brand,
+                e.cpu_model,
+                e.gpu_brand,
+                e.gpu_model,
+                e.ram,
+                e.storage_size,
+                e.storage_type
+            FROM listings l
+            INNER JOIN enriched_specs_laptops e
+                ON l.id = e.listing_id
+                AND l.site = e.site
+            WHERE l.id IN ({placeholders})
+        """
+
+        c.execute(query, new_laptop_ids)
+        new_listings = c.fetchall()
+
+        c.execute("SELECT email, filters FROM searches WHERE category = 'laptops' and is_active = 1")
+        searches = c.fetchall()
+
+        for listing in new_listings:
+            for search in searches:
+                user_filter = json.loads(search['filters'])
+
+                is_match, is_partial_match = listing_matches_filters_laptops(listing, user_filter)
+
+                if is_match:
+                    print(f"{search['email']}, {listing['id']}, {listing['enriched_model']} is a match! (partial match: {is_partial_match})")
+                    # send_notification(search['email'], listing, search['search_id'])
+
+
+def listing_matches_filters_laptops(listing, user_filter):
+    """
+    listing: row from enriched_specs_laptops
+    user_filter: dict with filter criteria
+    """
+
+    partial_match = False
+
+    if not (user_filter['min_price'] <= listing['price'] <= user_filter['max_price']):
+        return False, False
+
+    if user_filter['enriched_brand'] != "Any" and listing['enriched_brand'].lower() != user_filter['enriched_brand'].lower():
+        return False, False
+
+    if listing['screen_size'] is None:
+        partial_match = True
+    elif not (user_filter['min_screen_size'] <= float(listing['screen_size']) <= user_filter['max_screen_size']):
+        return False, partial_match
+    
+    if user_filter['panel_type'] != "Any":
+        if listing['panel_type'] is None:
+            partial_match = True
+        elif user_filter['panel_type'].lower().strip() != listing['panel_type'].lower().strip():
+            return False, partial_match
+        
+    if listing['refresh_rate'] is None:
+        partial_match = True
+    elif not (int(listing['refresh_rate']) >= user_filter['refresh_rate']):
+        return False, partial_match
+    
+    user_gpu = user_filter['gpu_model'].strip()
+    listing_gpu = (listing['gpu_model'] or "").lower().strip()
+    if user_gpu == 'Any':
+        pass
+    elif not listing_gpu:
+        partial_match = True
+    elif user_gpu not in listing_gpu:
+        return False, partial_match
+        
+    if listing['ram'] is None:
+        partial_match = True
+    elif not (int(listing['ram']) >= user_filter['ram']):
+        return False, partial_match
+    
+    if listing['storage_size'] is None:
+        partial_match = True
+    elif not (int(listing['storage_size']) >= user_filter['storage_size']):
+        return False, partial_match
+
+    return True, partial_match
 
 def add_search():
     with get_connection() as conn:
@@ -66,25 +176,24 @@ def remove_search():
 
 def get_laptop_filters():
     while True:
-        data = {
-            "brand": "Not specified", "min_screen": "Not specified",
-            "max_screen": "Not specified", "panel": "Not specified",
-            "refresh": "Not specified", "ram": "Not specified", "storage": "Not specified"
-        }
+        data = {"enriched_brand": "Any", "min_screen_size": 0.0, "max_screen_size": 99.0,
+                "panel_type": "Any", "refresh_rate": 0, "gpu_model": "Any", "ram": 0, "storage_size": 0,
+                "min_price": 0, "max_price": 9999999}
 
         only_price = input("Do you wish to only add a price filter (y/n)? ").lower()
 
         if only_price != "y":
-            data["brand"] = get_input("Brand: ")
-            data["min_screen"] = get_input("Minimum screen size (float): ", float)
-            data["max_screen"] = get_input("Maximum screen size (float): ", float)
-            data["panel"] = get_input("Panel type: ")
-            data["refresh"] = get_input("Minimum refresh rate (int): ", int)
-            data["ram"] = get_input("Minimum ram (GB): ", int)
-            data["storage"] = get_input("Minimum storage (GB): ", int)
+            data["enriched_brand"] = get_input("Brand: ", str, "Any")
+            data["min_screen_size"] = get_input("Minimum screen size (float): ", float, 0.0)
+            data["max_screen_size"] = get_input("Maximum screen size (float): ", float, 99.0)
+            data["panel_type"] = get_input("Panel type: ", str, "Any")
+            data["refresh_rate"] = get_input("Minimum refresh rate (int): ", int, 0)
+            data["gpu_model"] = get_input("GPU model (ex.: 3080, 4060) : ", str, "Any")
+            data["ram"] = get_input("Minimum ram (GB): ", int, 0)
+            data["storage_size"] = get_input("Minimum storage (GB): ", int, 0)
                 
-        data["min_price"] = get_input("Minimum price (int): ", int)
-        data["max_price"] = get_input("Maximum price (int): ", int)
+        data["min_price"] = get_input("Minimum price (int): ", int, 0)
+        data["max_price"] = get_input("Maximum price (int): ", int, 9999999)
 
         print("\n--- Review Your Filter ---")
         for key, value in data.items():
@@ -93,7 +202,7 @@ def get_laptop_filters():
         if input("\nDoes this look correct? (y/n): ").lower() in ('y', 'yes'):
             return json.dumps(data, indent=2)
 
-def get_input(prompt: str, cast_type: Callable[[Any], Any] = str, default: Any = "Not specified") -> Any:
+def get_input(prompt: str, cast_type: Callable[[Any], Any] = str, default: Any = None) -> Any:
     user_val = input(prompt).strip()
     if not user_val:
         return default
@@ -123,5 +232,7 @@ if __name__=="__main__":
         add_search()
     elif action == "remove":
         remove_search()
+    elif action == 'dev':
+        run_laptop_notifier(get_non_enriched_listings())
     else:
         print("Please type either 'add' or 'remove'")

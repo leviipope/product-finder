@@ -17,7 +17,7 @@ def get_active_listing_ids():
     conn.close()
     return {str(row['id']): bool(row['iced_status']) for row in results}
 
-def get_non_enriched_listings():
+def get_non_enriched_listings() -> list[int]:
     conn = get_connection()
     c = conn.cursor()
 
@@ -215,7 +215,13 @@ def get_connection():
         raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    create_searches_table()
+
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute('SELECT price from listings WHERE id = 7263145')
+        tmp = c.fetchone()
+        print(tmp['price'])
+        print(type(tmp['price']))
 
 if __name__ == "__main__":
     main()

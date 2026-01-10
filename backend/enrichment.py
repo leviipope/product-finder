@@ -4,6 +4,7 @@ import time
 from pydantic import BaseModel, Field
 from typing import Literal, Union
 from db import get_prompt, get_connection, get_non_enriched_listings
+from notifier import run_laptop_notifier
 
 class LaptopSpecs(BaseModel):
     brand: str
@@ -108,9 +109,8 @@ def enrich_listing(id: int, site: str, data: dict):
 
     print(f"✅ Listing {id} enriched, updated in database")
 
-def local_enrichment():
+def local_enrichment(non_enriched_listing_ids):
     MAX_RETRIES = 3
-    non_enriched_listing_ids = get_non_enriched_listings()
     start_total = time.time()
 
     for id in non_enriched_listing_ids:
@@ -141,5 +141,10 @@ def local_enrichment():
     elapsed_total = time.time() - start_total
     print(f"\n🏁 Total runtime: {elapsed_total:.2f}s")
 
+def main():
+    non_enriched_listing_ids = get_non_enriched_listings()
+    local_enrichment(non_enriched_listing_ids)
+    run_laptop_notifier(non_enriched_listing_ids)
+
 if __name__ == "__main__":
-    local_enrichment()
+    main()
