@@ -195,8 +195,9 @@ def create_searches_table():
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS searches(
-            search_id INTEGER PRIMARY KEY,
+            search_id INTEGER PRIMARY KEY,  
             email TEXT NOT NULL,
+            search_name TEXT NOT NULL,
             category TEXT NOT NULL,
             filters TEXT NOT NULL,
             is_active BOOLEAN
@@ -215,13 +216,8 @@ def get_connection():
         raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
+    pass
 
-    with get_connection() as conn:
-        c = conn.cursor()
-        c.execute('SELECT price from listings WHERE id = 7263145')
-        tmp = c.fetchone()
-        print(tmp['price'])
-        print(type(tmp['price']))
 
 if __name__ == "__main__":
     main()

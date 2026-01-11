@@ -1,10 +1,72 @@
 import json
 import sqlite3
+import yagmail
+import os
 from typing import Callable, Any
+from dotenv import load_dotenv
 from db import get_connection, get_non_enriched_listings
+from collections import defaultdict
 
-def send_notification(email, laptop, search_id):
-    pass
+load_dotenv()
+GOOGLE_APP_PASSWORD = os.getenv("GOOGLE_APP_PASSWORD")
+
+def send_laptop_notifications(matches_by_email):
+    '''
+    matches_by_email: dict where key=email, value=list of dicts with keys:
+        - listing: joined row from listings and enriched_specs_laptops
+        - is_partial_match: bool
+        - search_name: str
+    '''
+
+    yag = yagmail.SMTP("leviiytpublick@gmail.com", GOOGLE_APP_PASSWORD)
+
+    for email, data in matches_by_email.items():
+        subject = f"🔥 {len(data)} New Laptop Matches Found!"
+
+        html_body = f'''
+        <h3>Hello! We found {len(data)} laptops matching your searches.</h3>
+        <table border="1" cellpadding="10" style="border-collapse: collapse; width: 100%; font-family: sans-serif;">
+            <tr style="background-color: #f2f2f2;">
+                <th>Match type</th>
+                <th>Brand</th>
+                <th>Model</th>
+                <th>Specs</th>
+                <th>Price</th>
+                <th>Location</th>
+                <th>Link</th>
+            </tr>
+        '''
+
+        for match in data:
+            listing = match['listing']
+            is_partial_match = match['is_partial_match']
+
+            match_type = "⚠️ Partial" if is_partial_match else "✅ Match"
+            specs = f"{listing['cpu_brand']} {listing['cpu_model']} | {listing['gpu_brand']} {listing['gpu_model']} | {listing['ram']}GB | {listing['storage_size']}GB"
+
+            html_body += f'''
+            <tr>
+                <td style="text-align: center;">{match_type}</td>
+                <td><b>{listing['enriched_brand']}</b></td>
+                <td><b>{listing['enriched_model']}</b></td>
+                <td style="font-size: 0.9em; color: #555;">{specs}</td>
+                <td style="color: #2e7d32; font-weight: bold;">{listing['price']:,} {listing['currency']}</td>
+                <td>{listing['location']}</td>
+                <td><a href="{listing['listing_url']}" target="_blank">View Listing</a></td>
+            </tr>
+            '''
+
+        html_body += '</table><br><p>Happy hunting!</p>'
+
+        yag.send(
+            #to=email,
+            to="leviiytpublick@gmail.com",
+            subject=subject,
+            contents=html_body
+        )
+
+    print(f"Sent notifications to {len(matches_by_email)} users.")
+
 
 def run_laptop_notifier(new_laptop_ids):
     # tmp laptop ids for testing
@@ -51,19 +113,30 @@ def run_laptop_notifier(new_laptop_ids):
         c.execute(query, new_laptop_ids)
         new_listings = c.fetchall()
 
-        c.execute("SELECT email, filters FROM searches WHERE category = 'laptops' and is_active = 1")
+        c.execute("SELECT * FROM searches WHERE category = 'laptops' and is_active = 1")
         searches = c.fetchall()
+
+        matches_by_email = defaultdict(list)
 
         for listing in new_listings:
             for search in searches:
                 user_filter = json.loads(search['filters'])
-
                 is_match, is_partial_match = listing_matches_filters_laptops(listing, user_filter)
 
                 if is_match:
-                    print(f"{search['email']}, {listing['id']}, {listing['enriched_model']} is a match! (partial match: {is_partial_match})")
-                    # send_notification(search['email'], listing, search['search_id'])
+                    matches_by_email[search['email']].append({
+                        "listing": listing,
+                        "is_partial_match": is_partial_match,
+                        "search_name": search['search_name']
+                    })
 
+        for email, matches in matches_by_email.items():
+            print(f"Constructing email for {email}...")
+            for item in matches:
+                status = "PARTIAL" if item['is_partial_match'] else "FULL"
+                print(f" - [{status}] {item['listing']['enriched_model']}")
+
+        send_laptop_notifications(matches_by_email)
 
 def listing_matches_filters_laptops(listing, user_filter):
     """
@@ -122,6 +195,11 @@ def add_search():
         email = get_email()
 
         while True:
+            search_name = input("Please name your search: ")
+            if search_name != "":
+                break
+
+        while True:
             category = input("Please specify a category (laptops/gpus): ").strip().lower()
             if category == "laptops":
                 filter_results = get_laptop_filters()
@@ -130,13 +208,13 @@ def add_search():
                 print("gpu alerting not yet integrated")
                 return
 
-        query = 'INSERT INTO searches (email, category, filters, is_active) VALUES (?, ?, ?, ?)'
-        values = (email, category, filter_results, 1)
+        query = 'INSERT INTO searches (email, search_name, category, filters, is_active) VALUES (?, ?, ?, ?, ?)'
+        values = (email, search_name, category, filter_results, 1)
 
         try:
             c.execute(query, values)
             row_id = c.lastrowid
-            print(f"\nSearch added for {email}! Your Search ID is: {row_id}")
+            print(f"\nSearch {search_name} added for {email}! Your Search ID is: {row_id}")
             print(f"Keep this ID if you wish to delete this search later.")
         except Exception as e:
             print(f"Error saving to database: {e}")
