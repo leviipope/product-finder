@@ -9,6 +9,7 @@ from collections import defaultdict
 
 load_dotenv()
 GOOGLE_APP_PASSWORD = os.getenv("GOOGLE_APP_PASSWORD")
+GOOGLE_EMAIL = os.getenv("GOOGLE_EMAIL")
 
 def send_laptop_notifications(matches_by_email):
     '''
@@ -18,7 +19,7 @@ def send_laptop_notifications(matches_by_email):
         - search_name: str
     '''
 
-    yag = yagmail.SMTP("leviiytpublick@gmail.com", GOOGLE_APP_PASSWORD)
+    yag = yagmail.SMTP(GOOGLE_EMAIL, GOOGLE_APP_PASSWORD)
 
     for email, data in matches_by_email.items():
         subject = f"🔥 {len(data)} New Laptop Matches Found!"
@@ -32,6 +33,7 @@ def send_laptop_notifications(matches_by_email):
         <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background-color: #fff;">
             <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
                 <th style="{th_css}">Match</th>
+                <th style="{th_css}">Search</th>
                 <th style="{th_css}">Brand</th>
                 <th style="{th_css}">Model</th>
                 <th style="{th_css}">Specs</th>
@@ -53,6 +55,7 @@ def send_laptop_notifications(matches_by_email):
             html_body += f'''
             <tr style="border-bottom: 1px solid #dee2e6;">
                 <td style="padding: 12px 15px; vertical-align: middle;">{match_type}</td>
+                <td style="{td_css} color: #555;">{match['search_name']}</td>
                 <td style="{td_css} color: #333;">{listing['enriched_brand']}</td>
                 <td style="{td_css} font-weight: 600; color: #333;">{listing['enriched_model']}</td>
                 <td style="{td_css} font-size: 0.9em; color: #666; line-height: 1.4;">{specs}</td>
@@ -67,8 +70,7 @@ def send_laptop_notifications(matches_by_email):
         html_body += '</table><br><p style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #555;">Happy hunting!</p>'
 
         yag.send(
-            #to=email,
-            to="leviiytpublick@gmail.com",
+            to=email,
             subject=subject,
             contents=html_body
         )
@@ -77,8 +79,6 @@ def send_laptop_notifications(matches_by_email):
 
 
 def run_laptop_notifier(new_laptop_ids):
-    # tmp laptop ids for testing
-    new_laptop_ids = [7263145, 7274904, 7276182]
 
     with get_connection() as conn:
         c = conn.cursor()
@@ -287,6 +287,33 @@ def get_laptop_filters():
         
         if input("\nDoes this look correct? (y/n): ").lower() in ('y', 'yes'):
             return json.dumps(data, indent=2)
+        
+def toggle_active_serch():
+    email = get_email()
+    search_id = int(input("Please provide the id of the search you'd like to toggle: "))
+
+    with get_connection() as conn:
+        c = conn.cursor()
+
+        c.execute('SELECT * FROM searches WHERE search_id = ?', (search_id,))
+        search = c.fetchone()
+
+        if not search:
+            print("Error.")
+            return
+        
+        search_name = search['search_name']
+        search_email = search['email']
+        is_active = search['is_active']
+
+        if search_email != email:
+            print("Error.")
+            return
+        
+        new_status = 0 if is_active else 1
+        c.execute('UPDATE searches SET is_active = ? WHERE search_id = ?', (new_status, search_id))
+        status_str = "activated" if new_status else "deactivated"
+        print(f"Search '{search_name}' (ID: {search_id}) has been {status_str}.")
 
 def get_input(prompt: str, cast_type: Callable[[Any], Any] = str, default: Any = None) -> Any:
     user_val = input(prompt).strip()
@@ -312,13 +339,15 @@ def get_email():
         return email
 
 if __name__=="__main__":
-    action = input("Enter action (add/remove): ")
+    action = input("Enter action (add/remove/toggle): ")
 
     if action == "add":
         add_search()
     elif action == "remove":
         remove_search()
+    elif action == "toggle":
+        toggle_active_serch()
     elif action == 'dev':
         run_laptop_notifier(get_non_enriched_listings())
     else:
-        print("Please type either 'add' or 'remove'")
+        print("Please type either 'add', 'remove' or 'toggle'")

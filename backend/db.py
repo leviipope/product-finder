@@ -216,7 +216,7 @@ def get_connection():
         raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    pass
+    execute_sql("DELETE FROM enriched_specs_laptops WHERE listing_id = 7323415")
 
 
 if __name__ == "__main__":
