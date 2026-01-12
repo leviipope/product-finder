@@ -17,7 +17,7 @@ def get_active_listing_ids():
     conn.close()
     return {str(row['id']): bool(row['iced_status']) for row in results}
 
-def get_non_enriched_listings():
+def get_non_enriched_listings() -> list[int]:
     conn = get_connection()
     c = conn.cursor()
 
@@ -189,6 +189,21 @@ def create_enriched_specs_laptops_table():
         )
     ''')
 
+def create_searches_table():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS searches(
+            search_id INTEGER PRIMARY KEY,  
+            email TEXT NOT NULL,
+            search_name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            filters TEXT NOT NULL,
+            is_active BOOLEAN
+        )
+    ''')
+
 def get_connection():
     try:
         if not os.path.exists(DATABASE_PATH):
@@ -198,10 +213,11 @@ def get_connection():
         conn.row_factory = sqlite3.Row
         return conn
     except sqlite3.Error as e:
-        raise RuntimeError("\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
+        raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    execute_sql("DELETE FROM enriched_specs_laptops")
+    execute_sql("DELETE FROM enriched_specs_laptops WHERE listing_id = 7323415")
+
 
 if __name__ == "__main__":
     main()
