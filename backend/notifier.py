@@ -23,19 +23,25 @@ def send_laptop_notifications(matches_by_email):
     for email, data in matches_by_email.items():
         subject = f"🔥 {len(data)} New Laptop Matches Found!"
 
+        th_css = "padding: 12px 15px; text-align: left; color: #495057; font-weight: 600;"
+
         html_body = f'''
-        <h3>Hello! We found {len(data)} laptops matching your searches.</h3>
-        <table border="1" cellpadding="10" style="border-collapse: collapse; width: 100%; font-family: sans-serif;">
-            <tr style="background-color: #f2f2f2;">
-                <th>Match type</th>
-                <th>Brand</th>
-                <th>Model</th>
-                <th>Specs</th>
-                <th>Price</th>
-                <th>Location</th>
-                <th>Link</th>
+        <h3 style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #333; margin-bottom: 20px;">
+            Hello! We found {len(data)} laptops matching your searches.
+        </h3>
+        <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background-color: #fff;">
+            <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                <th style="{th_css}">Match</th>
+                <th style="{th_css}">Brand</th>
+                <th style="{th_css}">Model</th>
+                <th style="{th_css}">Specs</th>
+                <th style="{th_css}">Price</th>
+                <th style="{th_css}">Location</th>
+                <th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>
             </tr>
         '''
+
+        td_css = "padding: 12px 15px; vertical-align: middle;"
 
         for match in data:
             listing = match['listing']
@@ -45,18 +51,20 @@ def send_laptop_notifications(matches_by_email):
             specs = f"{listing['cpu_brand']} {listing['cpu_model']} | {listing['gpu_brand']} {listing['gpu_model']} | {listing['ram']}GB | {listing['storage_size']}GB"
 
             html_body += f'''
-            <tr>
-                <td style="text-align: center;">{match_type}</td>
-                <td><b>{listing['enriched_brand']}</b></td>
-                <td><b>{listing['enriched_model']}</b></td>
-                <td style="font-size: 0.9em; color: #555;">{specs}</td>
-                <td style="color: #2e7d32; font-weight: bold;">{listing['price']:,} {listing['currency']}</td>
-                <td>{listing['location']}</td>
-                <td><a href="{listing['listing_url']}" target="_blank">View Listing</a></td>
+            <tr style="border-bottom: 1px solid #dee2e6;">
+                <td style="padding: 12px 15px; vertical-align: middle;">{match_type}</td>
+                <td style="{td_css} color: #333;">{listing['enriched_brand']}</td>
+                <td style="{td_css} font-weight: 600; color: #333;">{listing['enriched_model']}</td>
+                <td style="{td_css} font-size: 0.9em; color: #666; line-height: 1.4;">{specs}</td>
+                <td style="{td_css} color: #2e7d32; font-weight: 700; white-space: nowrap;">{listing['price']:,} {listing['currency']}</td>
+                <td style="{td_css} color: #555;">{listing['location']}</td>
+                <td style="{td_css} text-align: center;">
+                    <a href="{listing['listing_url']}" target="_blank" style="background-color: #007bff; color: #ffffff; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 0.9em; display: inline-block;">View</a>
+                </td>
             </tr>
             '''
 
-        html_body += '</table><br><p>Happy hunting!</p>'
+        html_body += '</table><br><p style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #555;">Happy hunting!</p>'
 
         yag.send(
             #to=email,
