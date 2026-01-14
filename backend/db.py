@@ -160,49 +160,87 @@ def create_listings_table():
     conn.close()
 
 def create_enriched_specs_laptops_table():
-    conn = get_connection()
-    c = conn.cursor()
+    with get_connection() as conn:
+        c = conn.cursor()
 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS enriched_specs_laptops (
-            site TEXT NOT NULL,
-            listing_id INT NOT NULL,
-            enriched_model TEXT,
-            enriched_brand TEXT,
-            resolution TEXT,
-            screen_size TEXT,
-            panel_type TEXT,
-            refresh_rate TEXT,
-            cpu_brand TEXT,
-            cpu_model TEXT,
-            gpu_brand TEXT,
-            gpu_model TEXT,
-            gpu_type TEXT,
-            ram TEXT,
-            storage_size TEXT,
-            storage_type TEXT,
-            
-            PRIMARY KEY (site, listing_id),
-            FOREIGN KEY (site, listing_id) 
-                REFERENCES listings(site, id)
-                ON DELETE CASCADE
-        )
-    ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS enriched_specs_laptops (
+                site TEXT NOT NULL,
+                listing_id INT NOT NULL,
+                enriched_model TEXT,
+                enriched_brand TEXT,
+                resolution TEXT,
+                screen_size TEXT,
+                panel_type TEXT,
+                refresh_rate TEXT,
+                cpu_brand TEXT,
+                cpu_model TEXT,
+                gpu_brand TEXT,
+                gpu_model TEXT,
+                gpu_type TEXT,
+                ram TEXT,
+                storage_size TEXT,
+                storage_type TEXT,
+                
+                PRIMARY KEY (site, listing_id),
+                FOREIGN KEY (site, listing_id) 
+                    REFERENCES listings(site, id)
+                    ON DELETE CASCADE
+            )
+        ''')
 
 def create_searches_table():
-    conn = get_connection()
-    c = conn.cursor()
+    with get_connection() as conn:
+        c = conn.cursor()
 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS searches(
-            search_id INTEGER PRIMARY KEY,  
-            email TEXT NOT NULL,
-            search_name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            filters TEXT NOT NULL,
-            is_active BOOLEAN
-        )
-    ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS searches(
+                search_id INTEGER PRIMARY KEY,  
+                email TEXT NOT NULL,
+                search_name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                filters TEXT NOT NULL,
+                is_active BOOLEAN
+            )
+        ''')
+
+def create_laptop_view():
+    with get_connection() as conn:
+        c = conn.cursor()
+
+        c.execute('''
+            CREATE VIEW IF NOT EXISTS laptop_view AS
+            SELECT 
+                l.site,
+                l.id AS listing_id,
+                e.enriched_brand AS brand,
+                e.enriched_model AS model,
+                l.title,
+                l.price,
+                l.currency,
+                l.iced_status,
+                l.archived_at,
+                e.cpu_brand,
+                e.cpu_model,
+                e.gpu_brand,
+                e.gpu_model,
+                e.gpu_type,
+                e.ram,
+                e.storage_size,
+                e.resolution,
+                e.screen_size,
+                e.panel_type,
+                e.refresh_rate,
+                e.storage_type,
+                l.listing_url,
+                l.location,
+                l.listed_at,
+                l.scraped_at
+            FROM listings l
+            JOIN enriched_specs_laptops e
+            ON l.site = e.site AND l.id = e.listing_id
+            WHERE l.product_type = 'Notebook';
+        ''')
 
 def get_connection():
     try:
@@ -216,8 +254,7 @@ def get_connection():
         raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    execute_sql("DELETE FROM enriched_specs_laptops WHERE listing_id = 7323415")
-
+    pass
 
 if __name__ == "__main__":
     main()

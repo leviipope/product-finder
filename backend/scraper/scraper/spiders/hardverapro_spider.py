@@ -14,7 +14,8 @@ class HardverSpider(scrapy.Spider):
     start_urls = [
         #"https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_30xx/index.html",
         #"https://hardverapro.hu/index.html",
-        'https://hardverapro.hu/aprok/notebook/index.html'
+        #'https://hardverapro.hu/aprok/notebook/index.html'
+        'https://hardverapro.hu/aprok/hardver/videokartya/index.html'
         #"https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=210000&maxprice=211000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
     ]
 

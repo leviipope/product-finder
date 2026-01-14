@@ -79,7 +79,6 @@ def send_laptop_notifications(matches_by_email):
 
 
 def run_laptop_notifier(new_laptop_ids):
-
     with get_connection() as conn:
         c = conn.cursor()
 
@@ -129,7 +128,7 @@ def run_laptop_notifier(new_laptop_ids):
         for listing in new_listings:
             for search in searches:
                 user_filter = json.loads(search['filters'])
-                is_match, is_partial_match = listing_matches_filters_laptops(listing, user_filter)
+                is_match, is_partial_match = match_listings_to_filters_laptops(listing, user_filter)
 
                 if is_match:
                     matches_by_email[search['email']].append({
@@ -146,7 +145,7 @@ def run_laptop_notifier(new_laptop_ids):
 
         send_laptop_notifications(matches_by_email)
 
-def listing_matches_filters_laptops(listing, user_filter):
+def match_listings_to_filters_laptops(listing, user_filter):
     """
     listing: row from enriched_specs_laptops
     user_filter: dict with filter criteria
