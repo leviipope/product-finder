@@ -17,21 +17,41 @@ def get_active_listing_ids():
     conn.close()
     return {str(row['id']): bool(row['iced_status']) for row in results}
 
-def get_non_enriched_listings() -> list[int]:
-    conn = get_connection()
-    c = conn.cursor()
+def get_non_enriched_ids_by_product_type() -> dict[str, list[int]]:
+    laptop_ids = get_non_enriched_laptop_ids()
+    gpu_ids = get_non_enriched_gpu_ids()
 
-    c.execute("""
-        SELECT id FROM listings 
-        WHERE id NOT IN (SELECT listing_id FROM enriched_specs_laptops)
-    """)
-    results = c.fetchall()
+    return laptop_ids | gpu_ids
 
-    conn.close()
+def get_non_enriched_laptop_ids() -> dict[str, list[int]]:
+    with get_connection() as conn:
+        c = conn.cursor()
+        
+        c.execute("""
+            SELECT id FROM listings 
+            WHERE product_type = 'Notebook' 
+            AND id NOT IN (SELECT listing_id FROM enriched_specs_laptops)
+        """)
+        results = c.fetchall()
 
-    ids = [row['id'] for row in results]
+        ids = [row['id'] for row in results]
 
-    return ids
+        return {"laptop": ids}
+    
+def get_non_enriched_gpu_ids() -> dict[str, list[int]]:
+    with get_connection() as conn:
+        c = conn.cursor()
+        
+        c.execute("""
+            SELECT id FROM listings 
+            WHERE json_extract(category, '$[2]') = 'Videokártya'
+            AND id NOT IN (SELECT listing_id FROM enriched_gpus)
+        """)
+        results = c.fetchall()
+
+        ids = [row['id'] for row in results]
+
+        return {"gpu": ids}
 
 def get_latest_price(id):
     conn = get_connection()
@@ -61,16 +81,23 @@ def get_iced_status(id):
 
     return bool(row[0])
 
-def get_prompt(id):
+def get_prompt(id, product_type):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute(f"SELECT title, site, description FROM listings WHERE id = {id}")
+    c.execute(f"SELECT title, category, site, description FROM listings WHERE id = {id}")
 
     row = c.fetchone()
-    title, site, description = row
+    title, category, site, description = row
 
-    prompt = f"""
+    if product_type == "gpu":
+            prompt = f"""
+Title = {title}
+Here is the category hierarchy for the product (use this as a hint): {category}
+"""
+    else:
+        prompt = f"""
+Category = {category}
 Title = {title}
 Description = {description}
 """
@@ -189,6 +216,25 @@ def create_enriched_specs_laptops_table():
             )
         ''')
 
+def create_enriched_gpus_table():
+    with get_connection() as conn:
+        c = conn.cursor()
+
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS enriched_gpus (
+                site TEXT NOT NULL,
+                listing_id INT NOT NULL,
+                enriched_brand TEXT,
+                enriched_model TEXT,
+                vram INTEGER,
+                                
+                PRIMARY KEY (site, listing_id),
+                FOREIGN KEY (site, listing_id) 
+                    REFERENCES listings(site, id)
+                    ON DELETE CASCADE
+            )
+        ''')
+
 def create_searches_table():
     with get_connection() as conn:
         c = conn.cursor()
@@ -242,6 +288,32 @@ def create_laptop_view():
             WHERE l.product_type = 'Notebook';
         ''')
 
+def create_gpu_view():
+    with get_connection() as conn:
+        c = conn.cursor()
+
+        c.execute('''
+            CREATE VIEW IF NOT EXISTS gpu_view AS
+            SELECT 
+                l.site,
+                l.id AS listing_id,
+                e.enriched_brand AS brand,
+                e.enriched_model AS model,
+                e.vram,
+                l.price,
+                l.currency,
+                l.iced_status,
+                l.archived_at,
+                l.listing_url,
+                l.location,
+                l.listed_at,
+                l.scraped_at
+            FROM listings l
+            JOIN enriched_gpus e
+            ON l.site = e.site AND l.id = e.listing_id
+            WHERE json_extract(l.category, '$[2]') = 'Videokártya';
+        ''')
+
 def get_connection():
     try:
         if not os.path.exists(DATABASE_PATH):
@@ -254,7 +326,7 @@ def get_connection():
         raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    pass
+    execute_sql("Delete from enriched_specs_laptops where listing_id = 7323415")
 
 if __name__ == "__main__":
     main()

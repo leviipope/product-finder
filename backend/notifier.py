@@ -4,7 +4,7 @@ import yagmail
 import os
 from typing import Callable, Any
 from dotenv import load_dotenv
-from db import get_connection, get_non_enriched_listings
+from db import get_connection
 from collections import defaultdict
 
 load_dotenv()
@@ -337,6 +337,10 @@ def get_email():
 
         return email
 
+def run_notifiers(non_enriched_dict):
+    run_laptop_notifier(non_enriched_dict['laptop'])
+    run_laptop_notifier(non_enriched_dict['gpu'])
+
 if __name__=="__main__":
     action = input("Enter action (add/remove/toggle): ")
 
@@ -347,6 +351,6 @@ if __name__=="__main__":
     elif action == "toggle":
         toggle_active_serch()
     elif action == 'dev':
-        run_laptop_notifier(get_non_enriched_listings())
+        pass
     else:
         print("Please type either 'add', 'remove' or 'toggle'")

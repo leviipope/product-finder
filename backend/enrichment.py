@@ -2,9 +2,9 @@ import json
 import ollama
 import time
 from pydantic import BaseModel, Field
-from typing import Literal, Union
-from db import get_prompt, get_connection, get_non_enriched_listings
-from notifier import run_laptop_notifier
+from typing import Literal, Optional, Union
+from db import get_prompt, get_connection, get_non_enriched_ids_by_product_type
+from notifier import run_notifiers
 
 class LaptopSpecs(BaseModel):
     brand: str
@@ -44,22 +44,40 @@ class LaptopSpecs(BaseModel):
         description="Total storage capacity (summed) in GB (e.g., 512, 1256). Return as a clean integer. Use null if unknown."
     )
 
-    storage_type: Union[Literal['SSD', 'HDD', 'Hybrid'], None] = Field(
-        description="Type of storage(s). Use null if unknown."
+class GPUSpecs(BaseModel):
+    enriched_brand: Literal['NVIDIA', 'AMD', 'Intel'] = Field(
+        ...,
+        description="The primary manufacturer of the GPU chipset (NVIDIA, AMD, or Intel)."    )
+
+    enriched_model: str = Field(
+        ..., 
+        description="The full model name including the series. Examples: 'GeForce RTX 4070 Ti', 'Radeon RX 7900 XTX', 'Arc A770'."
     )
 
-def run_ollama(prompt: str, model="laptop-parser") -> str:
-    response = ollama.chat(model=model, messages=[{'role': 'user', 'content': prompt}], format=LaptopSpecs.model_json_schema())
+    vram_gb: Optional[int] = Field(
+            None, 
+            ge=1, 
+            le=48, 
+            description="The total amount of Video RAM in GB. Extract as a clean integer (e.g., 8, 12, 16, 24)."
+        )
+    
+def run_ollama(prompt: str, model, schema: type[BaseModel], product_type: str) -> str:
+
+    context_instructions = f"Extract {product_type} specifications from the following text according to the provided schema:\n\n"
+
+    response = ollama.chat(
+        model=model, 
+        messages=[{'role': 'user', 'content': context_instructions + prompt}], 
+        format=schema.model_json_schema())
 
     return response['message']['content']
 
-def parse_listing(id: int): 
-    prompt, site = get_prompt(id)
-    return run_ollama(prompt), site
+def parse_listing(id: int , model: str, schema: type[BaseModel], product_type: str) -> tuple[str, str]: 
+    prompt, site = get_prompt(id, product_type)
+    return run_ollama(prompt, model, schema, product_type), site
 
 def clean_output(llm_output: str) -> str:
     cleaned_output = llm_output.strip("` \n")
-
     return cleaned_output
     
 def load_json(cleaned_output: str):
@@ -72,7 +90,7 @@ def output_to_json(data):
         json.dump(data, f, indent=4, ensure_ascii=False)
     print(f"Data written to {output_file}")
 
-def enrich_listing(id: int, site: str, data: dict):
+def enrich_laptop(id: int, site: str, data: dict):
     brand = data.get("brand")
     model = data.get("model")
     resolution = data.get("resolution")
@@ -109,42 +127,83 @@ def enrich_listing(id: int, site: str, data: dict):
 
     print(f"✅ Listing {id} enriched, updated in database")
 
-def local_enrichment(non_enriched_listing_ids):
+def enrich_gpu(id: int, site: str, data: dict):
+    enriched_brand = data.get("enriched_brand")
+    enriched_model = data.get("enriched_model")
+    vram_gb = data.get("vram_gb")
+
+    with get_connection() as conn:
+        c = conn.cursor()
+
+        c.execute(
+            '''
+            INSERT INTO enriched_gpus (
+                site, listing_id, enriched_brand, enriched_model, vram
+            ) VALUES (?, ?, ?, ?, ?)
+            ''',
+            (
+                site, id, enriched_brand, enriched_model, vram_gb
+            )
+        )
+
+    print(f"✅ Listing {id} enriched, updated in database")
+
+def local_enrichment(non_enriched_dict):
     MAX_RETRIES = 3
     start_total = time.time()
 
-    for id in non_enriched_listing_ids:
-        print(f"\n🔹 Processing listing {id}")
-        start_listing = time.time()
+    for product_type, ids in non_enriched_dict.items():
+        print(f"\n🔷 Processing product type: {product_type.upper()}")
+        
+        if not ids:
+            print(f"No non-enriched listings found for {product_type}, skipping.")
+            continue
 
-        for attempt in range(1, MAX_RETRIES + 1):
-            start_attempt = time.time()
-            try:
-                llm_output, site = parse_listing(id)
-                cleaned_output = clean_output(llm_output)
-                data = load_json(cleaned_output)
-                # output_to_json(data)
-                enrich_listing(id, site, data)
+        for id in ids:
+            print(f"\n🔹 Processing listing {id}")
+            start_listing = time.time()
 
-                elapsed_attempt = time.time() - start_attempt
-                print(f"✅ Attempt {attempt} succeeded in {elapsed_attempt:.2f}s")
-                break
-            except Exception as e:
-                elapsed_attempt = time.time() - start_attempt
-                print(f"⚠️ Attempt {attempt} failed in {elapsed_attempt:.2f}s: {e}")
-                if attempt == MAX_RETRIES:
-                    print("❌ All retries failed, could not parse JSON")
+            for attempt in range(1, MAX_RETRIES + 1):
+                start_attempt = time.time()
+                try:
 
-        elapsed_listing = time.time() - start_listing
-        print(f"⏱ Finished listing {id} in {elapsed_listing:.2f}s")
+                    if product_type == "laptop":
+                        model = "laptop-parser"
+                        schema = LaptopSpecs
+                    elif product_type == "gpu":
+                        model = "general-parser" # testing
+                        schema = GPUSpecs
+
+                    llm_output, site = parse_listing(id, model, schema, product_type)
+
+                    cleaned_output = clean_output(llm_output)
+                    data = load_json(cleaned_output)
+
+                    if product_type == "laptop":
+                        #output_to_json(data)
+                        enrich_laptop(id, site, data)
+                    elif product_type == "gpu":
+                        enrich_gpu(id, site, data)
+
+                    elapsed_attempt = time.time() - start_attempt
+                    print(f"✅ Attempt {attempt} succeeded in {elapsed_attempt:.2f}s")
+                    break
+                except Exception as e:
+                    elapsed_attempt = time.time() - start_attempt
+                    print(f"⚠️ Attempt {attempt} failed in {elapsed_attempt:.2f}s: {e}")
+                    if attempt == MAX_RETRIES:
+                        print("❌ All retries failed, could not parse JSON")
+
+            elapsed_listing = time.time() - start_listing
+            print(f"⏱ Finished listing {id} in {elapsed_listing:.2f}s")
 
     elapsed_total = time.time() - start_total
     print(f"\n🏁 Total runtime: {elapsed_total:.2f}s")
 
 def main():
-    non_enriched_listing_ids = get_non_enriched_listings()
-    local_enrichment(non_enriched_listing_ids)
-    run_laptop_notifier(non_enriched_listing_ids)
+    non_enriched_dict = get_non_enriched_ids_by_product_type()
+    local_enrichment(non_enriched_dict)
+    run_notifiers(non_enriched_dict)
 
 if __name__ == "__main__":
     main()
