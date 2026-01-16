@@ -77,15 +77,11 @@ def send_laptop_notifications(matches_by_email):
 
     print(f"Sent notifications to {len(matches_by_email)} users.")
 
-
 def run_laptop_notifier(new_laptop_ids):
     with get_connection() as conn:
         c = conn.cursor()
 
         placeholders = ', '.join(['?'] * len(new_laptop_ids))
-
-        query = f"SELECT * FROM enriched_specs_laptops WHERE listing_id IN ({placeholders})"
-
         query = f"""
             SELECT 
                 l.site,
@@ -123,31 +119,75 @@ def run_laptop_notifier(new_laptop_ids):
         c.execute("SELECT * FROM searches WHERE category = 'laptops' and is_active = 1")
         searches = c.fetchall()
 
-        matches_by_email = defaultdict(list)
-
+        laptop_matches_by_email = defaultdict(list)
         for listing in new_listings:
             for search in searches:
                 user_filter = json.loads(search['filters'])
                 is_match, is_partial_match = match_listings_to_filters_laptops(listing, user_filter)
 
                 if is_match:
-                    matches_by_email[search['email']].append({
+                    laptop_matches_by_email[search['email']].append({
                         "listing": listing,
                         "is_partial_match": is_partial_match,
                         "search_name": search['search_name']
                     })
 
-        for email, matches in matches_by_email.items():
+        for email, matches in laptop_matches_by_email.items():
             print(f"Constructing email for {email}...")
             for item in matches:
                 status = "PARTIAL" if item['is_partial_match'] else "FULL"
                 print(f" - [{status}] {item['listing']['enriched_model']}")
 
-        send_laptop_notifications(matches_by_email)
+        send_laptop_notifications(laptop_matches_by_email)
+
+def run_gpu_notifier(new_gpu_ids):
+    with get_connection() as conn:
+        c = conn.cursor()
+
+        placeholders = ', '.join(['?'] * len(new_gpu_ids))
+        query = f"""
+            SELECT
+                l.site,
+                l.id,
+                l.price,
+                l.title,
+                l.iced_status,
+                l.price,
+                l.currency,
+                l.location,
+                l.listed_at,
+                l.listing_url,
+                e.enriched_brand,
+                e.enriched_model,
+            FROM listings l
+            INNER JOIN enriched_gpus e
+                ON l.id = e.listing_id
+                AND l.site = e.site
+            WHERE l.id IN ({placeholders})
+        """
+
+        c.execute(query, new_gpu_ids)
+        new_listings = c.fetchall()
+
+        c.execute("SELECT * FROM searches WHERE category = 'gpus' and is_active = 1")
+        searches = c.fetchall()
+
+        gpu_matches_by_email = defaultdict(list)
+        for listing in new_listings:
+            for search in searches:
+                user_filter = json.loads(search['filters'])
+                is_match = match_listings_to_filters_gpus(listing, user_filter)
+
+                if is_match:
+                    gpu_matches_by_email[search['email']].append({
+                        "listing": listing,
+                        "search_name": search['search_name']
+                    })
+
 
 def match_listings_to_filters_laptops(listing, user_filter):
     """
-    listing: row from enriched_specs_laptops
+    listing: joined row from listings and enriched_specs_laptops
     user_filter: dict with filter criteria
     """
 
@@ -196,6 +236,36 @@ def match_listings_to_filters_laptops(listing, user_filter):
 
     return True, partial_match
 
+def match_listings_to_filters_gpus(listing, user_filter):
+    """
+    listing: joined row from listings and enriched_gpus
+    user_filter: dict with filter criteria
+    """
+
+    def is_gpu_model_match(user_model, listing_model):
+        user_model = user_model.replace(' ', '').strip().lower()
+        listing_model = listing_model.replace(' ', '').strip().lower()
+        if user_model in listing_model:
+            return True
+
+    if user_filter['enriched_brand'] != "Any" and listing['enriched_brand'].lower() != user_filter['enriched_brand'].lower():
+        return False
+
+    user_model = user_filter['enriched_model']
+    listing_model = (listing['enriched_model'] or "")
+    if not listing_model:
+        return False
+
+    if isinstance(user_model, list):
+        for um in user_model:
+            if not is_gpu_model_match(um, listing_model):
+                return False
+    else:
+        if user_model != "Any" and not is_gpu_model_match(user_model, listing_model):
+            return False
+        
+    return True
+
 def add_search():
     with get_connection() as conn:
         c = conn.cursor()
@@ -212,8 +282,8 @@ def add_search():
                 filter_results = get_laptop_filters()
                 break
             elif category == "gpus":
-                print("gpu alerting not yet integrated")
-                return
+                filter_results = get_gpu_filters()
+                break
 
         query = 'INSERT INTO searches (email, search_name, category, filters, is_active) VALUES (?, ?, ?, ?, ?)'
         values = (email, search_name, category, filter_results, 1)
@@ -266,7 +336,6 @@ def get_laptop_filters():
                 "min_price": 0, "max_price": 9999999}
 
         only_price = input("Do you wish to only add a price filter (y/n)? ").lower()
-
         if only_price != "y":
             data["enriched_brand"] = get_input("Brand: ", str, "Any")
             data["min_screen_size"] = get_input("Minimum screen size (float): ", float, 0.0)
@@ -284,6 +353,32 @@ def get_laptop_filters():
         for key, value in data.items():
             print(f"{key.replace('_', ' ').title()}: {value}")
         
+        if input("\nDoes this look correct? (y/n): ").lower() in ('y', 'yes'):
+            return json.dumps(data, indent=2)
+        
+def get_gpu_filters():
+    while True:
+        data: dict[str, Any] = {"enriched_brand": "Any", "enriched_model": "Any",}
+
+        data['enriched_brand'] = get_input("Brand ('NVIDIA', 'AMD' or 'Intel'): ", str, "Any")
+        
+        only_one_model = input("How many models do you wish to search for? (one/more) ").lower()
+        if only_one_model == 'more':
+            data["enriched_model"] = []
+            print("Please type a model (ex. 3080/3070ti) and hit enter.")
+            print("If you are finished, type 'done' or ''.")
+            while model not in ("done", ""):
+                model = input("Model: ").lower().strip()
+                data["enriched_model"].append(model)
+
+        elif only_one_model == 'one':
+            model = get_input("Model: ", str, "Any")
+            data["enriched_model"] = model
+
+        print("\n--- Review Your Filter ---")
+        for key, value in data.items():
+            print(f"{key.replace('_', ' ').title()}: {value}")
+
         if input("\nDoes this look correct? (y/n): ").lower() in ('y', 'yes'):
             return json.dumps(data, indent=2)
         
