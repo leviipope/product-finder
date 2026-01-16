@@ -326,7 +326,8 @@ def get_connection():
         raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    execute_sql("Delete from enriched_specs_laptops where listing_id = 7323415")
+    # in the search table email column set email to '' where email is gpu@.
+    execute_sql("UPDATE searches SET email = 'leviiytpublick@gmail.com' WHERE search_id = 4;")
 
 if __name__ == "__main__":
     main()

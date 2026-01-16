@@ -3,8 +3,8 @@ import ollama
 import time
 from pydantic import BaseModel, Field
 from typing import Literal, Optional, Union
+from notifier import run_notifier
 from db import get_prompt, get_connection, get_non_enriched_ids_by_product_type
-from notifier import run_notifiers
 
 class LaptopSpecs(BaseModel):
     brand: str
@@ -203,7 +203,7 @@ def local_enrichment(non_enriched_dict):
 def main():
     non_enriched_dict = get_non_enriched_ids_by_product_type()
     local_enrichment(non_enriched_dict)
-    run_notifiers(non_enriched_dict)
+    run_notifier(non_enriched_dict)
 
 if __name__ == "__main__":
     main()

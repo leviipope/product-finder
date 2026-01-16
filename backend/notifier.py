@@ -11,73 +11,108 @@ load_dotenv()
 GOOGLE_APP_PASSWORD = os.getenv("GOOGLE_APP_PASSWORD")
 GOOGLE_EMAIL = os.getenv("GOOGLE_EMAIL")
 
-def send_laptop_notifications(matches_by_email):
+def run_notifier(non_enriched_dict):
+    new_laptop_ids = non_enriched_dict['laptop']
+    new_gpu_ids = non_enriched_dict['gpu']
+
+    laptop_matches_by_email = get_laptop_matches_per_email(new_laptop_ids)
+    gpu_matches_by_email = get_gpu_matches_per_email(new_gpu_ids)
+
+    combined_matches_by_email = defaultdict(list)
+    for email, laptop_matches in laptop_matches_by_email.items():
+        combined_matches_by_email[email].extend(laptop_matches)
+    for email, gpu_matches in gpu_matches_by_email.items():
+        combined_matches_by_email[email].extend(gpu_matches)
+
+    construct_email(combined_matches_by_email)
+
+def construct_email(matches_by_email):
     '''
     matches_by_email: dict where key=email, value=list of dicts with keys:
-        - listing: joined row from listings and enriched_specs_laptops
-        - is_partial_match: bool
+        - listing: joined row from listings and the enriched table (contains all listing data)
+        - is_partial_match: bool (only for laptops, not gpus)
         - search_name: str
     '''
 
     yag = yagmail.SMTP(GOOGLE_EMAIL, GOOGLE_APP_PASSWORD)
 
     for email, data in matches_by_email.items():
-        subject = f"🔥 {len(data)} New Laptop Matches Found!"
+        laptops, gpus = [], []
+        for item in data:
+            if 'is_partial_match' in item:
+                laptops.append(item)
+            else:
+                gpus.append(item)
 
+        subject = f"🔥 {len(data)} New Matches Found!"
         th_css = "padding: 12px 15px; text-align: left; color: #495057; font-weight: 600;"
-
-        html_body = f'''
-        <h3 style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #333; margin-bottom: 20px;">
-            Hello! We found {len(data)} laptops matching your searches.
-        </h3>
-        <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; background-color: #fff;">
-            <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
-                <th style="{th_css}">Match</th>
-                <th style="{th_css}">Search</th>
-                <th style="{th_css}">Brand</th>
-                <th style="{th_css}">Model</th>
-                <th style="{th_css}">Specs</th>
-                <th style="{th_css}">Price</th>
-                <th style="{th_css}">Location</th>
-                <th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>
-            </tr>
-        '''
-
         td_css = "padding: 12px 15px; vertical-align: middle;"
+        header_font = "font-family: 'Segoe UI', Helvetica, Arial, sans-serif;"
 
-        for match in data:
-            listing = match['listing']
-            is_partial_match = match['is_partial_match']
+        html_body = f'<h3 style="{header_font} color: #333;">Hello! We found matches for your searches.</h3>'
 
-            match_type = "⚠️ Partial" if is_partial_match else "✅ Match"
-            specs = f"{listing['cpu_brand']} {listing['cpu_model']} | {listing['gpu_brand']} {listing['gpu_model']} | {listing['ram']}GB | {listing['storage_size']}GB"
-
+        if laptops:
+            html_body += f'<h4 style="{header_font} color: #007bff;">💻 Laptops</h4>'
             html_body += f'''
-            <tr style="border-bottom: 1px solid #dee2e6;">
-                <td style="padding: 12px 15px; vertical-align: middle;">{match_type}</td>
-                <td style="{td_css} color: #555;">{match['search_name']}</td>
-                <td style="{td_css} color: #333;">{listing['enriched_brand']}</td>
-                <td style="{td_css} font-weight: 600; color: #333;">{listing['enriched_model']}</td>
-                <td style="{td_css} font-size: 0.9em; color: #666; line-height: 1.4;">{specs}</td>
-                <td style="{td_css} color: #2e7d32; font-weight: 700; white-space: nowrap;">{listing['price']:,} {listing['currency']}</td>
-                <td style="{td_css} color: #555;">{listing['location']}</td>
-                <td style="{td_css} text-align: center;">
-                    <a href="{listing['listing_url']}" target="_blank" style="background-color: #007bff; color: #ffffff; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 0.9em; display: inline-block;">View</a>
-                </td>
-            </tr>
+            <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">
+                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                    <th style="{th_css}">Match</th>
+                    <th style="{th_css}">Brand/Model</th>
+                    <th style="{th_css}">Specs</th>
+                    <th style="{th_css}">Price</th>
+                    <th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>
+                </tr>
             '''
+            for match in laptops:
+                listing = match['listing']
+                match_type = "⚠️ Partial" if match.get('is_partial_match') else "✅ Match"
+                specs = f"{listing['cpu_brand']} {listing['cpu_model']} | {listing['ram']}GB RAM"
+                
+                html_body += f'''
+                <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="{td_css}">{match_type}</td>
+                    <td style="{td_css}"><b>{listing['enriched_brand']}</b> {listing['enriched_model']}</td>
+                    <td style="{td_css} font-size: 0.9em; color: #666;">{specs}</td>
+                    <td style="{td_css} color: #2e7d32; font-weight: 700;">{listing['price']:,} {listing['currency']}</td>
+                    <td style="{td_css} text-align: center;">
+                        <a href="{listing['listing_url']}" target="_blank" style="background-color: #007bff; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>
+                    </td>
+                </tr>
+                '''
+            html_body += '</table>'
 
-        html_body += '</table><br><p style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #555;">Happy hunting!</p>'
+        if gpus:
+            html_body += f'<h4 style="{header_font} color: #6f42c1;">🎮 Graphics Cards</h4>'
+            html_body += f'''
+            <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">
+                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                    <th style="{th_css}">Search</th>
+                    <th style="{th_css}">Model</th>
+                    <th style="{th_css}">Price</th>
+                    <th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>
+                </tr>
+            '''
+            for match in gpus:
+                listing = match['listing']
+                html_body += f'''
+                <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="{td_css} color: #555;">{match['search_name']}</td>
+                    <td style="{td_css}"><b>{listing['enriched_brand']}</b> {listing['enriched_model']}</td>
+                    <td style="{td_css} color: #2e7d32; font-weight: 700;">{listing['price']:,} {listing['currency']}</td>
+                    <td style="{td_css} text-align: center;">
+                        <a href="{listing['listing_url']}" target="_blank" style="background-color: #6f42c1; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>
+                    </td>
+                </tr>
+                '''
+            html_body += '</table>'
 
-        yag.send(
-            to=email,
-            subject=subject,
-            contents=html_body
-        )
+        html_body += '<p style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #555;">Happy hunting!</p>'
+
+        yag.send(to=email, subject=subject, contents=html_body)
 
     print(f"Sent notifications to {len(matches_by_email)} users.")
 
-def run_laptop_notifier(new_laptop_ids):
+def get_laptop_matches_per_email(new_laptop_ids):
     with get_connection() as conn:
         c = conn.cursor()
 
@@ -123,7 +158,7 @@ def run_laptop_notifier(new_laptop_ids):
         for listing in new_listings:
             for search in searches:
                 user_filter = json.loads(search['filters'])
-                is_match, is_partial_match = match_listings_to_filters_laptops(listing, user_filter)
+                is_match, is_partial_match = match_listing_to_filters_laptops(listing, user_filter)
 
                 if is_match:
                     laptop_matches_by_email[search['email']].append({
@@ -132,15 +167,9 @@ def run_laptop_notifier(new_laptop_ids):
                         "search_name": search['search_name']
                     })
 
-        for email, matches in laptop_matches_by_email.items():
-            print(f"Constructing email for {email}...")
-            for item in matches:
-                status = "PARTIAL" if item['is_partial_match'] else "FULL"
-                print(f" - [{status}] {item['listing']['enriched_model']}")
+        return laptop_matches_by_email
 
-        send_laptop_notifications(laptop_matches_by_email)
-
-def run_gpu_notifier(new_gpu_ids):
+def get_gpu_matches_per_email(new_gpu_ids):
     with get_connection() as conn:
         c = conn.cursor()
 
@@ -158,7 +187,7 @@ def run_gpu_notifier(new_gpu_ids):
                 l.listed_at,
                 l.listing_url,
                 e.enriched_brand,
-                e.enriched_model,
+                e.enriched_model
             FROM listings l
             INNER JOIN enriched_gpus e
                 ON l.id = e.listing_id
@@ -176,16 +205,18 @@ def run_gpu_notifier(new_gpu_ids):
         for listing in new_listings:
             for search in searches:
                 user_filter = json.loads(search['filters'])
-                is_match = match_listings_to_filters_gpus(listing, user_filter)
+                is_match = match_listing_to_filters_gpus(listing, user_filter)
 
                 if is_match:
                     gpu_matches_by_email[search['email']].append({
                         "listing": listing,
                         "search_name": search['search_name']
                     })
+        
+        return gpu_matches_by_email
 
 
-def match_listings_to_filters_laptops(listing, user_filter):
+def match_listing_to_filters_laptops(listing, user_filter):
     """
     listing: joined row from listings and enriched_specs_laptops
     user_filter: dict with filter criteria
@@ -236,7 +267,7 @@ def match_listings_to_filters_laptops(listing, user_filter):
 
     return True, partial_match
 
-def match_listings_to_filters_gpus(listing, user_filter):
+def match_listing_to_filters_gpus(listing, user_filter):
     """
     listing: joined row from listings and enriched_gpus
     user_filter: dict with filter criteria
@@ -247,19 +278,26 @@ def match_listings_to_filters_gpus(listing, user_filter):
         listing_model = listing_model.replace(' ', '').strip().lower()
         if user_model in listing_model:
             return True
+        return False
 
     if user_filter['enriched_brand'] != "Any" and listing['enriched_brand'].lower() != user_filter['enriched_brand'].lower():
         return False
 
     user_model = user_filter['enriched_model']
     listing_model = (listing['enriched_model'] or "")
+
     if not listing_model:
         return False
 
     if isinstance(user_model, list):
+        atleast_one_match_found = False
         for um in user_model:
-            if not is_gpu_model_match(um, listing_model):
-                return False
+            if is_gpu_model_match(um, listing_model):
+                atleast_one_match_found = True
+                break
+
+        if not atleast_one_match_found:
+            return False
     else:
         if user_model != "Any" and not is_gpu_model_match(user_model, listing_model):
             return False
@@ -367,9 +405,13 @@ def get_gpu_filters():
             data["enriched_model"] = []
             print("Please type a model (ex. 3080/3070ti) and hit enter.")
             print("If you are finished, type 'done' or ''.")
-            while model not in ("done", ""):
+            model = "blank"
+            while True:
                 model = input("Model: ").lower().strip()
-                data["enriched_model"].append(model)
+                if model not in ("done", ""):
+                    data["enriched_model"].append(model)
+                else:
+                    break
 
         elif only_one_model == 'one':
             model = get_input("Model: ", str, "Any")
@@ -422,6 +464,8 @@ def get_input(prompt: str, cast_type: Callable[[Any], Any] = str, default: Any =
 def get_email():
     while True:
         email = input("Please provide your email: ").strip().lower()
+        if email == "admin":
+            return GOOGLE_EMAIL
         if not email or '@' not in email or '.' not in email:
             print("Please check if you provided the correct email.")
             continue
@@ -431,10 +475,6 @@ def get_email():
             continue
 
         return email
-
-def run_notifiers(non_enriched_dict):
-    run_laptop_notifier(non_enriched_dict['laptop'])
-    run_laptop_notifier(non_enriched_dict['gpu'])
 
 if __name__=="__main__":
     action = input("Enter action (add/remove/toggle): ")
@@ -446,6 +486,6 @@ if __name__=="__main__":
     elif action == "toggle":
         toggle_active_serch()
     elif action == 'dev':
-        pass
+        run_notifier({'laptop': [7224997], 'gpu': [7325292, 6397326, 7325355, 7274184, 7362311, 7352535]})
     else:
         print("Please type either 'add', 'remove' or 'toggle'")
