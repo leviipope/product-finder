@@ -46,64 +46,56 @@ def construct_email(matches_by_email):
 
         subject = f"🔥 {len(data)} New Matches Found!"
         th_css = "padding: 12px 15px; text-align: left; color: #495057; font-weight: 600;"
-        td_css = "padding: 12px 15px; vertical-align: middle;"
+        td_css = "padding: 12px 15px; vertical-align: middle; text-align: left;"
         header_font = "font-family: 'Segoe UI', Helvetica, Arial, sans-serif;"
 
         html_body = f'<h3 style="{header_font} color: #333;">Hello! We found matches for your searches.</h3>'
 
         if laptops:
             html_body += f'<h4 style="{header_font} color: #007bff;">💻 Laptops</h4>'
-            html_body += f'''
-            <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">
-                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
-                    <th style="{th_css}">Match</th>
-                    <th style="{th_css}">Brand/Model</th>
-                    <th style="{th_css}">Specs</th>
-                    <th style="{th_css}">Price</th>
-                    <th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>
-                </tr>
-            '''
+            html_body += (f'<table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">'
+                f'<tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">'
+                    f'<th style="{th_css}">Match</th>'
+                    f'<th style="{th_css}">Brand/Model</th>'
+                    f'<th style="{th_css}">Specs</th>'
+                    f'<th style="{th_css}">Price</th>'
+                    f'<th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>'
+                '</tr>')
             for match in laptops:
                 listing = match['listing']
                 match_type = "⚠️ Partial" if match.get('is_partial_match') else "✅ Match"
                 specs = f"{listing['cpu_brand']} {listing['cpu_model']} | {listing['ram']}GB RAM"
                 
-                html_body += f'''
-                <tr style="border-bottom: 1px solid #dee2e6;">
-                    <td style="{td_css}">{match_type}</td>
-                    <td style="{td_css}"><b>{listing['enriched_brand']}</b> {listing['enriched_model']}</td>
-                    <td style="{td_css} font-size: 0.9em; color: #666;">{specs}</td>
-                    <td style="{td_css} color: #2e7d32; font-weight: 700;">{listing['price']:,} {listing['currency']}</td>
-                    <td style="{td_css} text-align: center;">
-                        <a href="{listing['listing_url']}" target="_blank" style="background-color: #007bff; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>
-                    </td>
-                </tr>
-                '''
-            html_body += '</table>'
+                html_body += (f'<tr style="border-bottom: 1px solid #dee2e6;">'
+                    f'<td style="{td_css}">{match_type}</td>'
+                    f'<td style="{td_css}"><b>{listing["enriched_brand"]}</b> {listing["enriched_model"]}</td>'
+                    f'<td style="{td_css} font-size: 0.9em; color: #666;">{specs}</td>'
+                    f'<td style="{td_css} color: #2e7d32; font-weight: 700;">{listing["price"]:,} {listing["currency"]}</td>'
+                    f'<td style="{td_css} text-align: center;">'
+                        f'<a href="{listing["listing_url"]}" target="_blank" style="background-color: #007bff; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>'
+                    '</td>'
+                '</tr>')
+            html_body += '<br></table>'
 
         if gpus:
             html_body += f'<h4 style="{header_font} color: #6f42c1;">🎮 Graphics Cards</h4>'
-            html_body += f'''
-            <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">
-                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
-                    <th style="{th_css}">Search</th>
-                    <th style="{th_css}">Model</th>
-                    <th style="{th_css}">Price</th>
-                    <th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>
-                </tr>
-            '''
+            html_body += (f'<table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">'
+                f'<tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">'
+                    f'<th style="{th_css}">Search</th>'
+                    f'<th style="{th_css}">Model</th>'
+                    f'<th style="{th_css}">Price</th>'
+                    f'<th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>'
+                '</tr>')
             for match in gpus:
                 listing = match['listing']
-                html_body += f'''
-                <tr style="border-bottom: 1px solid #dee2e6;">
-                    <td style="{td_css} color: #555;">{match['search_name']}</td>
-                    <td style="{td_css}"><b>{listing['enriched_brand']}</b> {listing['enriched_model']}</td>
-                    <td style="{td_css} color: #2e7d32; font-weight: 700;">{listing['price']:,} {listing['currency']}</td>
-                    <td style="{td_css} text-align: center;">
-                        <a href="{listing['listing_url']}" target="_blank" style="background-color: #6f42c1; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>
-                    </td>
-                </tr>
-                '''
+                html_body += (f'<tr style="border-bottom: 1px solid #dee2e6;">'
+                    f'<td style="{td_css} color: #555;">{match["search_name"]}</td>'
+                    f'<td style="{td_css}"><b>{listing["enriched_brand"]}</b> {listing["enriched_model"]}</td>'
+                    f'<td style="{td_css} color: #2e7d32; font-weight: 700;">{listing["price"]:,} {listing["currency"]}</td>'
+                    f'<td style="{td_css} text-align: center;">'
+                        f'<a href="{listing["listing_url"]}" target="_blank" style="background-color: #6f42c1; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>'
+                    '</td>'
+                '</tr>')
             html_body += '</table>'
 
         html_body += '<p style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #555;">Happy hunting!</p>'
