@@ -44,6 +44,13 @@ class CleanDataPipeline:
                 price_str = adapter.get('price')
                 if isinstance(price_str, str):
                     cleaned_price = price_str.replace(' ', '').replace('Ft', '').strip()
+                    if 'M' in cleaned_price:
+                        cleaned_price = cleaned_price.replace('M', '')
+                        try:
+                            price_value = float(cleaned_price.replace(',', '.')) * 1_000_000
+                            cleaned_price = str(int(price_value))
+                        except ValueError:
+                            spider.logger.warning(f"Could not convert price with M: {price_str}")
                     try:
                         adapter['price'] = int(cleaned_price)
                     except ValueError:
