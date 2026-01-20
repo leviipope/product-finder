@@ -2,6 +2,7 @@ import json
 import sqlite3
 import yagmail
 import os
+import re
 from typing import Callable, Any
 from dotenv import load_dotenv
 from db import get_connection
@@ -266,11 +267,25 @@ def match_listing_to_filters_gpus(listing, user_filter):
     """
 
     def is_gpu_model_match(user_model, listing_model):
+        def check_ti(s):
+            return bool(re.search(r'(\d+ti|\bti\b|superti)', s.lower()))
+        def check_super(s):
+            return bool(re.search(r'(\d+super|\bsuper\b|tisuper)', s.lower()))
+
+        user_searching_for_ti = check_ti(user_model)
+        listing_is_ti = check_ti(listing_model)
+        user_searching_for_super = check_super(user_model)
+        listing_is_super = check_super(listing_model)
+
+        if user_searching_for_ti != listing_is_ti:
+            return False
+        
+        if user_searching_for_super != listing_is_super:
+            return False
+
         user_model = user_model.replace(' ', '').strip().lower()
         listing_model = listing_model.replace(' ', '').strip().lower()
-        if user_model in listing_model:
-            return True
-        return False
+        return user_model in listing_model
 
     if user_filter['enriched_brand'] != "Any" and listing['enriched_brand'].lower() != user_filter['enriched_brand'].lower():
         return False
@@ -287,11 +302,10 @@ def match_listing_to_filters_gpus(listing, user_filter):
             if is_gpu_model_match(um, listing_model):
                 atleast_one_match_found = True
                 break
-
         if not atleast_one_match_found:
             return False
     else:
-        if user_model != "Any" and not is_gpu_model_match(user_model, listing_model):
+        if user_filter['max_price'] < listing['price'] or (user_model != "Any" and not is_gpu_model_match(user_model, listing_model)):
             return False
         
     return True
@@ -363,7 +377,7 @@ def get_laptop_filters():
     while True:
         data = {"enriched_brand": "Any", "min_screen_size": 0.0, "max_screen_size": 99.0,
                 "panel_type": "Any", "refresh_rate": 0, "gpu_model": "Any", "ram": 0, "storage_size": 0,
-                "min_price": 0, "max_price": 9999999}
+                "min_price": 0, "max_price": 9_999_999}
 
         only_price = input("Do you wish to only add a price filter (y/n)? ").lower()
         if only_price != "y":
@@ -377,7 +391,7 @@ def get_laptop_filters():
             data["storage_size"] = get_input("Minimum storage (GB): ", int, 0)
                 
         data["min_price"] = get_input("Minimum price (int): ", int, 0)
-        data["max_price"] = get_input("Maximum price (int): ", int, 9999999)
+        data["max_price"] = get_input("Maximum price (int): ", int, 9_999_999)
 
         print("\n--- Review Your Filter ---")
         for key, value in data.items():
@@ -388,11 +402,13 @@ def get_laptop_filters():
         
 def get_gpu_filters():
     while True:
-        data: dict[str, Any] = {"enriched_brand": "Any", "enriched_model": "Any",}
+        data: dict[str, Any] = {"enriched_brand": "Any", "enriched_model": "Any", "max_price": 9_999_999}
 
         data['enriched_brand'] = get_input("Brand ('NVIDIA', 'AMD' or 'Intel'): ", str, "Any")
         
-        only_one_model = input("How many models do you wish to search for? (one/more) ").lower()
+        print("Do you wish to search for one model or multiple models?")
+        print("Note: Searching for multiple models will not allow you to set a maximum price.")
+        only_one_model = input("Answer (one/more): ").lower()
         if only_one_model == 'more':
             data["enriched_model"] = []
             print("Please type a model (ex. 3080/3070ti) and hit enter.")
@@ -406,8 +422,8 @@ def get_gpu_filters():
                     break
 
         elif only_one_model == 'one':
-            model = get_input("Model: ", str, "Any")
-            data["enriched_model"] = model
+            data["enriched_model"] = get_input("Model: ", str, "Any")
+            data["max_price"] = get_input("Maximum price (int): ", int, 9_999_999)
 
         print("\n--- Review Your Filter ---")
         for key, value in data.items():
@@ -478,6 +494,6 @@ if __name__=="__main__":
     elif action == "toggle":
         toggle_active_serch()
     elif action == 'dev':
-        run_notifier({'laptop': [7224997], 'gpu': [7325292, 6397326, 7325355, 7274184, 7362311, 7352535]})
+        run_notifier({'laptop': [7224997], 'gpu': [7361551, 7315451, 7354973, 7351280, 7355918, 7272662]})
     else:
         print("Please type either 'add', 'remove' or 'toggle'")
