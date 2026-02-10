@@ -43,7 +43,7 @@ class CleanDataPipeline:
             if adapter.get('price'):
                 price_str = adapter.get('price')
                 if isinstance(price_str, str):
-                    cleaned_price = price_str.replace(' ', '').replace('Ft', '').strip()
+                    cleaned_price = price_str.replace('\xa0', '').replace(' ', '').replace('Ft', '').strip()
                     if 'M' in cleaned_price:
                         cleaned_price = cleaned_price.replace('M', '')
                         try:
@@ -166,11 +166,39 @@ class SQLitePipeline:
     
     def close_spider(self, spider):
         print(f"\033[38;5;217mClosing Spider...\033[0m")
-        missing_ids = set(spider.active_listings.keys()) - spider.seen_ids
+        missing_ids = list(set(spider.active_listings.keys()) - spider.seen_ids)
         archived_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        for listing_id in missing_ids:
-            query = "UPDATE listings SET archived_at = ? WHERE id = ?"
-            self.cursor.execute(query, [archived_at, listing_id])
-            print(f"\033[38;5;218mArchived: {listing_id}\033[0m")
-        self.conn.commit()
+
+        if not missing_ids:
+            print(f"\033[38;5;82m[INFO] No missing IDs found. Database is up to date.\033[0m")
+            self.conn.close()
+            return
+
+        print(f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Checking against {len(spider.categories_scraped)} scraped categories...\033[0m")
+        
+        id_placeholders = ', '.join(['?'] * len(missing_ids))
+        cat_placeholders = ', '.join(['?'] * len(spider.categories_scraped))
+
+        query = f"""
+            UPDATE listings
+            SET archived_at = ?
+            WHERE id IN ({id_placeholders})
+            AND product_type IN ({cat_placeholders})
+        """
+
+        params = [archived_at] + missing_ids + list(spider.categories_scraped)
+
+        try:
+            self.cursor.execute(query, params)
+            updated_count = self.cursor.rowcount
+
+            if updated_count > 0:
+                print(f"\033[38;5;82m[INFO] Archived {updated_count} listings that were missing and matched scraped categories.\033[0m")
+            else:
+                print(f"\033[38;5;214m[INFO] No listings were archived. Missing IDs did not match any scraped categories.\033[0m")
+
+            self.conn.commit()
+        except Exception as e:
+            print(f"\033[91m[ERROR] Failed to archive missing listings: {e}\033[0m")
+
         self.conn.close()

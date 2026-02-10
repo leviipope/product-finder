@@ -27,8 +27,19 @@ class HardverSpider(scrapy.Spider):
         super().__init__(*args, **kwargs)
         self.active_listings = get_active_listing_ids()
         self.seen_ids = set()
+        self.categories_scraped = set()
 
     def parse(self, response):
+        breadcrumb = response.css("ol.breadcrumb")
+        breadcrumb_text = breadcrumb.xpath('string(.)').get()
+        if breadcrumb_text:
+            breadcrumb_text = breadcrumb_text.replace("\t", " ").replace("\n", " ").strip()
+            parts = breadcrumb_text.split()
+            if len(parts) >= 2:
+                product_type = parts[1]
+                self.categories_scraped.add(product_type)
+                print(f"\033[92mDEBUG: Added category: {product_type}\033[0m")
+
         listings = response.css('ul.list-unstyled > li[class]')
 
         for listing in listings:
@@ -42,11 +53,19 @@ class HardverSpider(scrapy.Spider):
                 iced_status = False
 
             price = listing.css("div[class='uad-col uad-col-price'] span::text").get()
-            if price == "Keresem":
+            if price in ["Keresem", "Csere"]:
                 continue
 
             if data_uadid in self.active_listings:
-                current_price = int(price.replace(' ', '').replace('Ft', '').strip())
+                clean_price = price.replace('\xa0', '').replace(' ', '').replace('Ft', '').strip()
+                try:
+                    if 'M' in clean_price:
+                        current_price = int(float(clean_price.replace('M', '').replace(',', '.')) * 1_000_000)
+                    else:
+                        current_price = int(clean_price)
+                except ValueError:
+                    self.logger.warning(f"Could not parse price for item {data_uadid}: '{price}'")
+                    continue
 
                 latest_price_in_db = get_latest_price(data_uadid)
                 iced_status_in_db = self.active_listings[data_uadid]
