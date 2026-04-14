@@ -12,8 +12,8 @@ from backend.db import get_active_listing_ids, get_latest_price
 class HardverSpider(scrapy.Spider):
     name = "hardver"
     start_urls = [
-        "https://hardverapro.hu/aprok/notebook/index.html",
-        "https://hardverapro.hu/aprok/hardver/videokartya/index.html"
+        "https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=&maxprice=&cmpid_text=&cmpid=&usrid_text=&usrid=&buying=0&stext_none=&__brandnew=1&__brandnew=0",
+        "https://hardverapro.hu/aprok/hardver/videokartya/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=&maxprice=&cmpid_text=&cmpid=&usrid_text=&usrid=&buying=0&stext_none=&__brandnew=1&__brandnew=0",
     ]
 
     custom_settings = {
