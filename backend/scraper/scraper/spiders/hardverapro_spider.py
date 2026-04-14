@@ -12,11 +12,8 @@ from backend.db import get_active_listing_ids, get_latest_price
 class HardverSpider(scrapy.Spider):
     name = "hardver"
     start_urls = [
-        #"https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_30xx/index.html",
-        #"https://hardverapro.hu/index.html",
-        'https://hardverapro.hu/aprok/notebook/index.html',
-        'https://hardverapro.hu/aprok/hardver/videokartya/index.html'
-        #"https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=210000&maxprice=211000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
+        "https://hardverapro.hu/aprok/notebook/index.html",
+        "https://hardverapro.hu/aprok/hardver/videokartya/index.html"
     ]
 
     custom_settings = {
@@ -43,6 +40,17 @@ class HardverSpider(scrapy.Spider):
         listings = response.css('ul.list-unstyled > li[class]')
 
         for listing in listings:
+            if listing.css("div[class='uad-corner-ribbon uad-corner-ribbon-bazaar']"):
+                self.logger.info(f"\033[38;5;153mSkipping bazaar item: {listing.attrib.get('data-uadid')}\033[0m")
+                continue
+
+            title = listing.css("div[class='uad-col uad-col-title'] > h1 > a::text").get().lower()
+            if title and any(keyword in title.lower() for keyword in 
+                             ["folyamatosan frissül", "tisztítás", "pasztázás", "xx", "xxx", "csere", "hibás", "javítás", "új és használt", "licencek", "bazár",
+                              "karbantartás", "szervíz"]
+                             ):
+                continue
+
             data_uadid = listing.attrib.get('data-uadid')
             self.seen_ids.add(data_uadid)
 
