@@ -55,12 +55,13 @@ Product Finder is a powerful tool designed to scrape used laptop listings from [
 
 ### 1. Scraping Listings
 
-To start scraping listings from HardverApró, navigate to the scraper directory and run the spider:
+Use the manual scrape script only if you want to scrape manually:
 
 ```bash
-cd backend/scraper
-scrapy crawl hardver
+python scripts/manual_scrape.py
 ```
+
+The script restores `data/database.db` from the `data` branch before it runs the spider.
 
 This will fetch listings and populate the `listings` table in `data/database.db`.
 
@@ -83,6 +84,7 @@ This will read descriptions from the database, query the local Ollama model, and
   - **`db.py`**: Database connection and schema management.
   - **`enrichment.py`**: Logic for communicating with Ollama and updating the database.
   - **`main.py`**: Entry point (currently used for maintenance/testing).
+- **`scripts/`**: Helper scripts, including the manual scrape entry point.
 - **`data/`**: Stores the SQLite database (`database.db`).
 - **`Modelfile`**: Definition of the custom Ollama model for JSON extraction.
 

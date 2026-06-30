@@ -1,0 +1,50 @@
+name: Daily Scrapy Run
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        fetch-depth: 0
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        python-version: '3.11'
+        enable-cache: true
+
+    - name: Restore database snapshot from data branch
+      run: |
+        git fetch origin data
+        git checkout origin/data -- data/database.db
+
+    - name: Run Scrapy spider
+      working-directory: backend/scraper
+      run: uv run --with scrapy --with itemadapter scrapy crawl hardver
+
+    - name: Commit database snapshot to data branch
+      run: |
+        worktree_path=$(mktemp -d)
+        git fetch origin data
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git worktree add --detach "$worktree_path" origin/data
+        cp data/database.db "$worktree_path/data/database.db"
+        cd "$worktree_path"
+        git add data/database.db
+        git commit -m "Update database snapshot"
+        git push origin HEAD:data
+        cd "$GITHUB_WORKSPACE"
+        git worktree remove "$worktree_path" --force
