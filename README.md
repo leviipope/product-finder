@@ -63,6 +63,12 @@ python scripts/manual_scrape.py
 
 The script restores `data/database.db` from the `data` branch before it runs the spider.
 
+After the scrape finishes, publish the updated database snapshot to the `data` branch with:
+
+```bash
+python scripts/post_scrape_db_save.py
+```
+
 This will fetch listings and populate the `listings` table in `data/database.db`.
 
 ### 2. Enriching Data

@@ -40,14 +40,7 @@ def main() -> int:
 
     result = subprocess.run(command, cwd=scraper_dir)
 
-    print("\033[91m\033[1mDON'T FORGET TO RUN THE COMMANDS IN YOU WANT TO SAVE THE LOCAL SCRAPE\033[0m")
-
-    # After a manual scrape, publish the updated snapshot back to `data`.
-    # git switch data
-    # git add data/database.db
-    # git commit -m "Update database snapshot"
-    # git push origin data
-    # git switch main
+    print("\033[91m\033[1mAfter the scrape, run python scripts/post_scrape_db_save.py to publish data/database.db to the data branch.\033[0m")
     return result.returncode
 
 
