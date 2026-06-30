@@ -39,6 +39,13 @@ def main() -> int:
     ]
 
     result = subprocess.run(command, cwd=scraper_dir)
+
+    # After a manual scrape, publish the updated snapshot back to `data`.
+    # git switch data
+    # git add data/database.db
+    # git commit -m "Update database snapshot"
+    # git push origin data
+    # git switch main
     return result.returncode
 
 
