@@ -1,0 +1,61 @@
+name: Commit and Force Push DB Update
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '00 4 * * *' 
+
+permissions:
+  contents: write  
+
+jobs:
+  run-scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          uv pip install scrapy itemadapter uvloop
+
+      - name: Run Scrapy script
+        run: |
+          uv scrapy crawl hardver
+
+      - name: Commit and Force Push DB Update
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if git diff --quiet data/database.db; then
+            echo "No changes detected in database.db. Skipping commit."
+            exit 0
+          fi
+
+          git add data/database.db
+
+          LAST_COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+
+          if [[ "$LAST_COMMIT_MESSAGE" == *"Github Actions database update"* ]]; then
+            # Extract the counter using grep. If it fails to find one, default to 1.
+            COUNTER=$(echo "$LAST_COMMIT_MESSAGE" | grep -oP 'Counter: \K\d+' || echo "1")
+            COUNTER=$((COUNTER + 1))
+            COMMIT_MESSAGE="Github Actions database update - $(date '+%Y-%m-%d %H:%M:%S') - Counter: $COUNTER"
+            git commit --amend -m "$COMMIT_MESSAGE"
+          else
+            COMMIT_MESSAGE="Github Actions database update - $(date '+%Y-%m-%d %H:%M:%S') - Counter: 1"
+            git commit -m "$COMMIT_MESSAGE"
+          fi
+
+          git push origin HEAD:main --force
