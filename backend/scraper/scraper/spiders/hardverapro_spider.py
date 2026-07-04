@@ -12,11 +12,8 @@ from backend.db import get_active_listing_ids, get_latest_price
 class HardverSpider(scrapy.Spider):
     name = "hardver"
     start_urls = [
-        #"https://hardverapro.hu/aprok/notebook/pc/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=&maxprice=&cmpid_text=&cmpid=&usrid_text=&usrid=&buying=0&stext_none=&__brandnew=1&__brandnew=0",
-        #"https://hardverapro.hu/aprok/hardver/videokartya/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=&maxprice=&cmpid_text=&cmpid=&usrid_text=&usrid=&buying=0&stext_none=&__brandnew=1&__brandnew=0",
-        
-        # Testing github actions with 5090s
-        "https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_50xx_sorozat/keres.php?stext=5090&stcid_text=&stcid=&stmid_text=&stmid=&minprice=&maxprice=&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
+        # Testing github actions with 24 result listing site
+        "https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_6xx_5xx_4xx_3xx_2xx/index.html",
     ]
 
     custom_settings = {
