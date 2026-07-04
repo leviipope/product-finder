@@ -16,7 +16,16 @@ class HardverSpider(scrapy.Spider):
         "https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_6xx_5xx_4xx_3xx_2xx/index.html",
         
         # 8 result listing site
-        "https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_10xx/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=70000&maxprice=75000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",    ]
+        "https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_10xx/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=70000&maxprice=75000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",    
+        
+        # 9 result listing site
+        "https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_20xx/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=70000&maxprice=73000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
+        
+        # 2 result listing site
+        "https://hardverapro.hu/aprok/hardver/videokartya/nvidia/geforce_16xx/keres.php?stext=&stcid_text=&stcid=&stmid_text=&stmid=&minprice=50000&maxprice=90000&cmpid_text=&cmpid=&usrid_text=&usrid=&__buying=1&__buying=0&stext_none=&__brandnew=1&__brandnew=0",
+
+        ]
+    
 
     custom_settings = {
         'DOWNLOAD_DELAY': 1,
