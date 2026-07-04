@@ -30,6 +30,7 @@ jobs:
           uv pip install scrapy itemadapter uvloop
 
       - name: Run Scrapy script
+        working-directory: ./backend/scraper
         run: |
           uv run scrapy crawl hardver
 
