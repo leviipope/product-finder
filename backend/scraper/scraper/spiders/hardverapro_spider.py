@@ -18,6 +18,12 @@ class HardverSpider(scrapy.Spider):
 
     custom_settings = {
         'DOWNLOAD_DELAY': 1,
+        'ROBOTSTXT_OBEY': False,
+        'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'COOKIES_ENABLED': False,
+        'AUTOTHROTTLE_ENABLED': True,
+        'AUTOTHROTTLE_START_DELAY': 1,
+        'AUTOTHROTTLE_TARGET_CONCURRENCY': 1.0,
     }
 
     def __init__(self, *args, **kwargs):
