@@ -21,6 +21,9 @@ import db
 
 class CleanDataPipeline:
     def process_item(self, item, spider):
+        if spider.name != "hardver":
+            return item
+
         adapter = ItemAdapter(item)
         print(f"\033[92mCleanDataPipeline: Processing item {adapter['id']}\033[0m")
 
@@ -78,6 +81,20 @@ class SQLitePipeline:
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
         id = adapter["id"]
+
+        if adapter.get("action") == "archive":
+            archived_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            query = "UPDATE listings SET archived_at = ? WHERE id = ?"
+
+            try:
+                self.cursor.execute(query, (archived_at, id))
+                self.conn.commit()
+                print(f"\033[38;5;21mSQLitePipeline: Item {id} archived successfully.\033[0m")
+            except Exception as e:
+                print(f"\033[91mSQLitePipeline: Failed to archive item {id}: {e}\033[0m")
+
+            return item
+
         print(f"\033[94mSQLitePipeline: Processing item {id}\033[0m")
 
         is_iced_update = (
@@ -165,7 +182,12 @@ class SQLitePipeline:
         return item
     
     def close_spider(self, spider):
-        print(f"\033[38;5;217mClosing Spider...\033[0m")
+        if spider.name != "hardver":
+            print(f"\033[94mSQLitePipeline: Closing Spider {spider.name}...\033[0m")
+            self.conn.close()
+            return
+
+        print(f"\033[38;5;217mClosing hardver Spider...\033[0m")
 
         MINIMUM_EXPECTED_ITEMS = 2000
         if len(spider.categories_scraped) >= 2 and len(spider.seen_ids) < MINIMUM_EXPECTED_ITEMS:
@@ -174,38 +196,22 @@ class SQLitePipeline:
             return
 
         missing_ids = list(set(spider.active_listings.keys()) - spider.seen_ids)
-        archived_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS verification_queue (id INTEGER PRIMARY KEY)")
+        self.cursor.execute("DELETE FROM verification_queue")
 
         if not missing_ids:
             print(f"\033[38;5;82m[INFO] No missing IDs found. Database is up to date.\033[0m")
+            self.conn.commit()
             self.conn.close()
             return
 
         print(f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Checking against {len(spider.categories_scraped)} scraped categories...\033[0m")
         
-        id_placeholders = ', '.join(['?'] * len(missing_ids))
-        cat_placeholders = ', '.join(['?'] * len(spider.categories_scraped))
+        self.cursor.executemany(
+            "INSERT INTO verification_queue (id) VALUES (?)",
+            [(int(id),) for id in missing_ids]
+        )
 
-        query = f"""
-            UPDATE listings
-            SET archived_at = ?
-            WHERE id IN ({id_placeholders})
-            AND product_type IN ({cat_placeholders})
-        """
-
-        params = [archived_at] + missing_ids + list(spider.categories_scraped)
-
-        try:
-            self.cursor.execute(query, params)
-            updated_count = self.cursor.rowcount
-
-            if updated_count > 0:
-                print(f"\033[38;5;82m[INFO] Archived {updated_count} listings that were missing and matched scraped categories.\033[0m")
-            else:
-                print(f"\033[38;5;214m[INFO] No listings were archived. Missing IDs did not match any scraped categories.\033[0m")
-
-            self.conn.commit()
-        except Exception as e:
-            print(f"\033[91m[ERROR] Failed to archive missing listings: {e}\033[0m")
-
+        self.conn.commit()
         self.conn.close()
