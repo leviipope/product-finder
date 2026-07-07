@@ -60,3 +60,8 @@ jobs:
           fi
 
           git push origin HEAD:${{ github.ref_name }} --force
+
+      - name: Check Scrape Stats
+        working-directory: ./backend
+        run: |
+          uv run print_scrape_stats.py
