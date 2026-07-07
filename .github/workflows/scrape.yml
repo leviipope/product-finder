@@ -32,7 +32,7 @@ jobs:
       - name: Run Scrapy script
         working-directory: ./backend/scraper
         run: |
-          uv run scrapy crawl hardver
+          uv run scrapy crawl hardver && uv run scrapy crawl verifier
 
       - name: Commit and Force Push DB Update
         run: |
@@ -60,3 +60,8 @@ jobs:
           fi
 
           git push origin HEAD:${{ github.ref_name }} --force
+
+      - name: Check Scrape Stats
+        working-directory: ./backend
+        run: |
+          uv run print_scrape_stats.py

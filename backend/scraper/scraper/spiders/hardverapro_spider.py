@@ -18,6 +18,12 @@ class HardverSpider(scrapy.Spider):
 
     custom_settings = {
         'DOWNLOAD_DELAY': 1,
+        'ROBOTSTXT_OBEY': False,
+        'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'COOKIES_ENABLED': False,
+        'AUTOTHROTTLE_ENABLED': True,
+        'AUTOTHROTTLE_START_DELAY': 1,
+        'AUTOTHROTTLE_TARGET_CONCURRENCY': 1.0,
     }
 
     def __init__(self, *args, **kwargs):
@@ -40,6 +46,9 @@ class HardverSpider(scrapy.Spider):
         listings = response.css('ul.list-unstyled > li[class]')
 
         for listing in listings:
+            data_uadid = listing.attrib.get('data-uadid')
+            self.seen_ids.add(data_uadid)
+
             if listing.css("div[class='uad-corner-ribbon uad-corner-ribbon-bazaar']"):
                 self.logger.info(f"\033[38;5;153mSkipping bazaar item: {listing.attrib.get('data-uadid')}\033[0m")
                 continue
@@ -47,12 +56,9 @@ class HardverSpider(scrapy.Spider):
             title = listing.css("div[class='uad-col uad-col-title'] > h1 > a::text").get().lower()
             if title and any(keyword in title.lower() for keyword in 
                              ["folyamatosan frissül", "tisztítás", "pasztázás", "xx", "xxx", "csere", "hibás", "javítás", "új és használt", "licencek", "bazár",
-                              "karbantartás", "szervíz"]
+                              "karbantartás", "szervíz", "szerviz", "csomag", "támasztékok", "töltő", "tolto", "mining", "bányász"]
                              ):
                 continue
-
-            data_uadid = listing.attrib.get('data-uadid')
-            self.seen_ids.add(data_uadid)
 
             iced_status = listing.css("div[class='uad-col uad-col-price'] div::attr(class)").get()
             if iced_status == "uad-price uad-price-iced":
@@ -118,8 +124,14 @@ class HardverSpider(scrapy.Spider):
         img = response.meta.get('img')
 
         title = response.css('head title::text').get()
+
         category_div = response.css("div.container > div > ol.breadcrumb")
         category_text = category_div.xpath('string(.)').get().replace("\t", " ").replace("\n", " ").replace("  ", " ").replace("  ", "/").strip()
+        if any(keyword in category_text.lower() for keyword in ["tartozék", "alkatrész"]):
+            if data_uadid in self.seen_ids:
+                self.seen_ids.remove(data_uadid)
+            print(f"\033[38;5;226mSkipping item {data_uadid} because it is in a forbidden category: {category_text}\033[0m")
+            return
 
         seller = response.css('td > b > a[style][href]::text').get()
         seller_profile_url_relativ = response.css('td > b > a[style][href]::attr(href)').get()
