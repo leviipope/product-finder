@@ -130,7 +130,7 @@ class HardverSpider(scrapy.Spider):
         if any(keyword in category_text.lower() for keyword in ["tartozék", "alkatrész"]):
             if data_uadid in self.seen_ids:
                 self.seen_ids.remove(data_uadid)
-            print(f"\033[38;5;196mSkipping item {data_uadid} because it is in a forbidden category: {category_text}\033[0m")
+            print(f"\033[38;5;226mSkipping item {data_uadid} because it is in a forbidden category: {category_text}\033[0m")
             return
 
         seller = response.css('td > b > a[style][href]::text').get()
