@@ -190,7 +190,7 @@ class SQLitePipeline:
         print(f"\033[38;5;217mClosing hardver Spider...\033[0m")
 
         MINIMUM_EXPECTED_ITEMS = 2000
-        if len(spider.categories_scraped) >= 2 and len(spider.seen_ids) < MINIMUM_EXPECTED_ITEMS:
+        if len(spider.seen_ids) < MINIMUM_EXPECTED_ITEMS:
             print(f"\033[38;5;196m[ERROR] Crawl aborted early or blocked. Only scraped {len(spider.seen_ids)} items. Possible scraping issue. Aborting archiving logic to prevent false data loss.\033[0m")
             self.conn.close()
             return
