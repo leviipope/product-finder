@@ -12,16 +12,16 @@ class VerificationSpiderSpider(scrapy.Spider):
     name = "verifier"
 
     custom_settings = {
-            'DOWNLOAD_DELAY': 1,
+            'DOWNLOAD_DELAY': 0.2,
             'ROBOTSTXT_OBEY': False,
             'REDIRECT_ENABLED': True,
             'HTTPERROR_ALLOW_ALL': True,
             'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'COOKIES_ENABLED': False,
             'AUTOTHROTTLE_ENABLED': True,
-            'AUTOTHROTTLE_START_DELAY': 1,
+            'AUTOTHROTTLE_START_DELAY': 0.5,
             'AUTOTHROTTLE_MAX_DELAY': 10,
-            'AUTOTHROTTLE_TARGET_CONCURRENCY': 1.0,
+            'AUTOTHROTTLE_TARGET_CONCURRENCY': 2.0,
         }
 
     def start_requests(self):
@@ -70,11 +70,11 @@ class VerificationSpiderSpider(scrapy.Spider):
             is_archived = True
 
         if is_archived:
-            print(f"\033[38;5;21m[VERIFIED ARCHIVE] Item {data_uadid} is gone. Archiving. Link: {listing_url}\033[0m")
+            self.logger.info(f"\033[38;5;21m[VERIFIED ARCHIVE] Item {data_uadid} is gone. Archiving. Link: {listing_url}\033[0m")
             yield {
                 'id': data_uadid,
                 'action': 'archive'
             }
         else:
-            print(f"\033[38;5;82m[FALSE POSITIVE PREVENTED] Item {data_uadid} is still alive! Link: {listing_url}\033[0m")
+            self.logger.info(f"\033[38;5;82m[FALSE POSITIVE PREVENTED] Item {data_uadid} is still alive! Link: {listing_url}\033[0m")
 

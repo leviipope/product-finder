@@ -62,6 +62,19 @@ def get_latest_price(id):
 
         return int(row[0])
 
+def get_latest_prices(ids):
+    if not ids:
+        return {}
+
+    with get_connection() as conn:
+        c = conn.cursor()
+        placeholders = ', '.join('?' for _ in ids)
+        query = f"SELECT id, price FROM listings WHERE id IN ({placeholders})"
+        c.execute(query, ids)
+        results = c.fetchall()
+
+        return {str(row['id']): int(row['price']) for row in results}
+
 def get_iced_status(id):
     with get_connection() as conn:
         c = conn.cursor()
@@ -306,7 +319,7 @@ def get_connection():
         raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    create_searches_table()
+    pass
 
 
 if __name__ == "__main__":

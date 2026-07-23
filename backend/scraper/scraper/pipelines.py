@@ -25,7 +25,7 @@ class CleanDataPipeline:
             return item
 
         adapter = ItemAdapter(item)
-        print(f"\033[92mCleanDataPipeline: Processing item {adapter['id']}\033[0m")
+        spider.logger.info(f"\033[92mCleanDataPipeline: Processing item {adapter['id']}\033[0m")
 
         if adapter.get('id') is not None:
             adapter['id'] = int(adapter['id'])
@@ -77,6 +77,13 @@ class SQLitePipeline:
         print("\033[94mSQLitePipeline: Initializing\033[0m")
         self.conn = db.get_connection()
         self.cursor = self.conn.cursor()
+        self.active_listings = {}
+        self.latest_prices = {}
+    
+    def opened_spider(self, spider):
+        if spider.name == "hardver":
+            self.active_listings = spider.active_listings
+            self.latest_prices = spider.latest_prices
 
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
@@ -89,25 +96,25 @@ class SQLitePipeline:
             try:
                 self.cursor.execute(query, (archived_at, id))
                 self.conn.commit()
-                print(f"\033[38;5;21mSQLitePipeline: Item {id} archived successfully.\033[0m")
+                spider.logger.info(f"\033[38;5;21mSQLitePipeline: Item {id} archived successfully.\033[0m")
             except Exception as e:
-                print(f"\033[91mSQLitePipeline: Failed to archive item {id}: {e}\033[0m")
+                spider.logger.error(f"\033[91mSQLitePipeline: Failed to archive item {id}: {e}\033[0m")
 
             return item
 
-        print(f"\033[94mSQLitePipeline: Processing item {id}\033[0m")
+        spider.logger.debug(f"\033[94mSQLitePipeline: Processing item {id}\033[0m")
 
         is_iced_update = (
             adapter.get("id") is not None
             and adapter.get("iced_status") is not None
-            and adapter.get("iced_status") != db.get_iced_status(id)
+            and adapter.get("iced_status") != self.active_listings.get(id)
             and adapter.get("description") is None
         )
 
         is_price_update = (
             adapter.get("id") is not None
             and adapter.get("price") is not None
-            and adapter.get("price") != db.get_latest_price(id)
+            and adapter.get("price") != self.latest_prices.get(id)
             and adapter.get("description") is None
         )
 
@@ -121,12 +128,12 @@ class SQLitePipeline:
                 try:
                     self.cursor.execute(query, values)
                     self.conn.commit()
-                    print(f"\033[38;5;153mSQLitePipeline: Iced status updated successfully {id}\033[0m")
+                    spider.logger.info(f"\033[38;5;153mSQLitePipeline: Iced status updated successfully {id}\033[0m")
                 except Exception as e:
-                    print(f"\033[91mSQLitePipeline: Failed to update iced status: {id}, {e}\033[0m")
+                    spider.logger.error(f"\033[91mSQLitePipeline: Failed to update iced status: {id}, {e}\033[0m")
 
             if is_price_update:
-                old_price = db.get_latest_price(id)
+                old_price = self.latest_prices.get(id)
                 new_price = adapter['price']
 
                 self.cursor.execute("SELECT price_history FROM listings WHERE id = ?", (id,))
@@ -146,9 +153,9 @@ class SQLitePipeline:
                 try:
                     self.cursor.execute(query, values)
                     self.conn.commit()
-                    print(f"\033[38;5;153mSQLitePipeline: Price updated successfully {id}\033[0m")
+                    spider.logger.info(f"\033[38;5;153mSQLitePipeline: Price updated successfully {id}\033[0m")
                 except Exception as e:
-                    print(f"\033[91mSQLitePipeline: Failed to update price: {id}, {e}\033[0m")
+                    spider.logger.error(f"\033[91mSQLitePipeline: Failed to update price: {id}, {e}\033[0m")
                 
             return item    
             
@@ -175,23 +182,23 @@ class SQLitePipeline:
         try:
             self.cursor.execute(query, values)
             self.conn.commit()
-            print(f"\033[94mSQLitePipeline: Item {id} inserted successfully\033[0m")
+            spider.logger.debug(f"\033[94mSQLitePipeline: Item {id} inserted successfully\033[0m")
         except Exception as e:
-            print(f"\033[91mSQLitePipeline: Failed to insert Item {id}: {e}\033[0m")
+            spider.logger.error(f"\033[91mSQLitePipeline: Failed to insert Item {id}: {e}\033[0m")
 
         return item
     
     def close_spider(self, spider):
         if spider.name != "hardver":
-            print(f"\033[94mSQLitePipeline: Closing Spider {spider.name}...\033[0m")
+            spider.logger.info(f"\033[94mSQLitePipeline: Closing Spider {spider.name}...\033[0m")
             self.conn.close()
             return
 
-        print(f"\033[38;5;217mClosing hardver Spider...\033[0m")
+        spider.logger.info(f"\033[38;5;217mClosing hardver Spider...\033[0m")
 
         MINIMUM_EXPECTED_ITEMS = 2000
         if len(spider.seen_ids) < MINIMUM_EXPECTED_ITEMS:
-            print(f"\033[38;5;196m[ERROR] Crawl aborted early or blocked. Only scraped {len(spider.seen_ids)} items. Possible scraping issue. Aborting archiving logic to prevent false data loss.\033[0m")
+            spider.logger.error(f"\033[38;5;196m[ERROR] Crawl aborted early or blocked. Only scraped {len(spider.seen_ids)} items. Possible scraping issue. Aborting archiving logic to prevent false data loss.\033[0m")
             self.conn.close()
             return
 
@@ -201,12 +208,12 @@ class SQLitePipeline:
         self.cursor.execute("DELETE FROM verification_queue")
 
         if not missing_ids:
-            print(f"\033[38;5;82m[INFO] No missing IDs found. Database is up to date.\033[0m")
+            spider.logger.info(f"\033[38;5;82m[INFO] No missing IDs found. Database is up to date.\033[0m")
             self.conn.commit()
             self.conn.close()
             return
 
-        print(f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Checking against {len(spider.categories_scraped)} scraped categories...\033[0m")
+        spider.logger.info(f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Checking against {len(spider.categories_scraped)} scraped categories...\033[0m")
         
         self.cursor.executemany(
             "INSERT INTO verification_queue (id) VALUES (?)",
