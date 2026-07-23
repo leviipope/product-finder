@@ -8,14 +8,12 @@ db_path = os.path.abspath(db_path)
 DATABASE_PATH = db_path
 
 def get_active_listing_ids():
-    conn = get_connection()
-    c = conn.cursor()
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, iced_status FROM listings WHERE archived_at IS NULL")
+        results = c.fetchall()
 
-    c.execute("SELECT id, iced_status FROM listings WHERE archived_at IS NULL")
-    results = c.fetchall()
-
-    conn.close()
-    return {str(row['id']): bool(row['iced_status']) for row in results}
+        return {str(row['id']): bool(row['iced_status']) for row in results}
 
 def get_non_enriched_ids_by_product_type() -> dict[str, list[int]]:
     laptop_ids = get_non_enriched_laptop_ids()
@@ -54,137 +52,132 @@ def get_non_enriched_gpu_ids() -> dict[str, list[int]]:
         return {"gpu": ids}
 
 def get_latest_price(id):
-    conn = get_connection()
-    c = conn.cursor()
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT price FROM listings WHERE id = ?", (id,))
+        row = c.fetchone()
 
-    c.execute(f"SELECT price FROM listings WHERE id = {id}")
-    row = c.fetchone()
+        if row is None:
+            return None
 
-    conn.close()
+        return int(row[0])
 
-    if row is None:
-        return None
+def get_latest_prices(ids):
+    if not ids:
+        return {}
 
-    return int(row[0])
+    with get_connection() as conn:
+        c = conn.cursor()
+        placeholders = ', '.join('?' for _ in ids)
+        query = f"SELECT id, price FROM listings WHERE id IN ({placeholders})"
+        c.execute(query, ids)
+        results = c.fetchall()
+
+        return {str(row['id']): int(row['price']) for row in results}
 
 def get_iced_status(id):
-    conn = get_connection()
-    c = conn.cursor()
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT iced_status FROM listings WHERE id = ?", (id,))
+        row = c.fetchone()
 
-    c.execute(f"SELECT iced_status FROM listings WHERE id = {id}")
-    row = c.fetchone()
+        if row is None:
+            return None
 
-    conn.close()
-
-    if row is None:
-        return None
-
-    return bool(row[0])
+        return bool(row[0])
 
 def get_prompt(id, product_type):
-    conn = get_connection()
-    c = conn.cursor()
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT title, category, site, description FROM listings WHERE id = ?", (id,))
 
-    c.execute(f"SELECT title, category, site, description FROM listings WHERE id = {id}")
+        row = c.fetchone()
+        title, category, site, description = row
 
-    row = c.fetchone()
-    title, category, site, description = row
-
-    if product_type == "gpu":
+        if product_type == "gpu":
             prompt = f"""
 Title = {title}
 Here is the category hierarchy for the product (use this as a hint): {category}
 """
-    else:
-        prompt = f"""
+        else:
+            prompt = f"""
 Category = {category}
 Title = {title}
 Description = {description}
 """
 
-    conn.close()
-
     return prompt, site
 
 def get_all_listings():
     """Prints all listings in the table, but only prints attributes that have value"""
-    conn = get_connection()
-    c = conn.cursor()
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM listings")
+        results = c.fetchall()
 
-    c.execute("SELECT * FROM listings")
-    results = c.fetchall()
+        if not results:
+            print("Table is empty")
+            return None
 
-    if not results:
-        print("Table is empty")
-        return None
+        number_of_listings = 0
 
-    number_of_listings = 0
-
-    for row in results:
-        row_dict = dict(row)
-        filtered = {k: v for k, v in row_dict.items() if v is not None}
-        number_of_listings += 1
-        print(filtered)
-    print(f"\n{'-'*33}\nNumber of listings in total: {number_of_listings}")
-
-    conn.close()
+        for row in results:
+            row_dict = dict(row)
+            filtered = {k: v for k, v in row_dict.items() if v is not None}
+            number_of_listings += 1
+            print(filtered)
+            
+        print(f"\n{'-'*33}\nNumber of listings in total: {number_of_listings}")
+        
 
 def execute_sql(sql):
-    conn = get_connection()
-    c = conn.cursor()
-
-    if isinstance(sql, str):
-        c.execute(sql)
-    else:
-        print("SQL code has to be string")
-
-    conn.commit()
-    conn.close()
+    with get_connection() as conn:
+        c = conn.cursor()
+        if isinstance(sql, str):
+            c.execute(sql)
+        else:
+            print("SQL code has to be string")
 
 def list_tables():
-    conn = get_connection()
-    c = conn.cursor()
+    with get_connection() as conn:
+        c = conn.cursor()
 
-    c.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = [row[0] for row in c.fetchall()]
+        c.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [row[0] for row in c.fetchall()]
 
-    conn.close()
     print(tables)
 
 def create_listings_table():
-    conn = get_connection()
-    c = conn.cursor()
+    with get_connection() as conn:
+        c = conn.cursor()
 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS listings (
-            site TEXT,
-            id INT UNIQUE NOT NULL,
-            title TEXT,
-            category TEXT,
-            product_type TEXT,
-            iced_status BOOLEAN,
-            iced_at DATE,
-            archived_at DATE,
-            price INT,
-            price_history TEXT,
-            currency TEXT,
-            img TEXT,
-            seller TEXT,
-            seller_rating TEXT,
-            seller_profile_url TEXT,
-            location TEXT,
-            delivery_options TEXT,
-            listed_at DATE,
-            listing_url TEXT,
-            description TEXT,
-            scraped_at DATE,
-              
-            PRIMARY KEY (site, id)
-        )
-    ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS listings (
+                site TEXT,
+                id INT UNIQUE NOT NULL,
+                title TEXT,
+                category TEXT,
+                product_type TEXT,
+                iced_status BOOLEAN,
+                iced_at DATE,
+                archived_at DATE,
+                price INT,
+                price_history TEXT,
+                currency TEXT,
+                img TEXT,
+                seller TEXT,
+                seller_rating TEXT,
+                seller_profile_url TEXT,
+                location TEXT,
+                delivery_options TEXT,
+                listed_at DATE,
+                listing_url TEXT,
+                description TEXT,
+                scraped_at DATE,
 
-    conn.commit()
-    conn.close()
+                PRIMARY KEY (site, id)
+            )
+        ''')
 
 def create_enriched_specs_laptops_table():
     with get_connection() as conn:
@@ -327,6 +320,7 @@ def get_connection():
 
 def main():
     pass
+
 
 if __name__ == "__main__":
     main()

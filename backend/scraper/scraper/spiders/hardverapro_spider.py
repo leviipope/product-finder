@@ -7,7 +7,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from backend.db import get_active_listing_ids, get_latest_price
+from backend.db import get_active_listing_ids, get_latest_prices
 
 class HardverSpider(scrapy.Spider):
     name = "hardver"
@@ -17,18 +17,20 @@ class HardverSpider(scrapy.Spider):
     ]
 
     custom_settings = {
-        'DOWNLOAD_DELAY': 1,
+        'DOWNLOAD_DELAY': 0.2,
+        'CONCURRENT_REQUESTS_PER_DOMAIN': 2,
         'ROBOTSTXT_OBEY': False,
         'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'COOKIES_ENABLED': False,
         'AUTOTHROTTLE_ENABLED': True,
-        'AUTOTHROTTLE_START_DELAY': 1,
-        'AUTOTHROTTLE_TARGET_CONCURRENCY': 1.0,
+        'AUTOTHROTTLE_START_DELAY': 0.5,
+        'AUTOTHROTTLE_TARGET_CONCURRENCY': 2.0,
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.active_listings = get_active_listing_ids()
+        self.latest_prices = get_latest_prices(list(self.active_listings.keys()))
         self.seen_ids = set()
         self.categories_scraped = set()
 
@@ -41,7 +43,7 @@ class HardverSpider(scrapy.Spider):
             if len(parts) >= 2:
                 product_type = parts[1]
                 self.categories_scraped.add(product_type)
-                print(f"\033[92mDEBUG: Added category: {product_type}\033[0m")
+                self.logger.info(f"\033[92mDEBUG: Added category: {product_type}\033[0m")
 
         listings = response.css('ul.list-unstyled > li[class]')
 
@@ -81,21 +83,21 @@ class HardverSpider(scrapy.Spider):
                     self.logger.warning(f"Could not parse price for item {data_uadid}: '{price}'")
                     continue
 
-                latest_price_in_db = get_latest_price(data_uadid)
+                latest_price_in_db = self.latest_prices.get(str(data_uadid))
                 iced_status_in_db = self.active_listings[data_uadid]
 
                 price_changed = current_price != latest_price_in_db
                 iced_status_changed = iced_status != iced_status_in_db
 
                 if price_changed or iced_status_changed:
-                    print(f"\033[38;5;153mSending item as iced item or price update item: {data_uadid}\033[0m")
+                    self.logger.info(f"\033[38;5;153mSending item as iced item or price update item: {data_uadid}\033[0m")
                     yield {
                         'id': data_uadid,
                         'iced_status': iced_status,
                         'price': price,
                     }
                 else:
-                    print(f"\033[38;5;215mSkipped because duplicate: {data_uadid} (this item will not go to any pipeline)\033[0m")
+                    self.logger.info(f"\033[38;5;215mSkipping because no change: {data_uadid} (this item will not go to any pipeline)\033[0m")
                 
                 continue
 
@@ -130,7 +132,7 @@ class HardverSpider(scrapy.Spider):
         if any(keyword in category_text.lower() for keyword in ["tartozék", "alkatrész"]):
             if data_uadid in self.seen_ids:
                 self.seen_ids.remove(data_uadid)
-            print(f"\033[38;5;226mSkipping item {data_uadid} because it is in a forbidden category: {category_text}\033[0m")
+            self.logger.info(f"\033[38;5;226mSkipping item {data_uadid} because it is in a forbidden category: {category_text}\033[0m")
             return
 
         seller = response.css('td > b > a[style][href]::text').get()
