@@ -29,10 +29,15 @@ jobs:
         run: |
           uv pip install scrapy itemadapter uvloop
 
-      - name: Run Scrapy script
+      - name: Run Scrapy script - hardver
         working-directory: ./backend/scraper
         run: |
-          uv run scrapy crawl hardver && uv run scrapy crawl verifier
+          uv run scrapy crawl hardver
+
+      - name: Run Scrapy script - verifer
+        working-directory: ./backend/scraper
+        run: |
+          uv run scrapy crawl verifer
 
       - name: Commit and Force Push DB Update
         run: |
