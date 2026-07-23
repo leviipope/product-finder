@@ -69,7 +69,7 @@ class HardverSpider(scrapy.Spider):
                 iced_status = False
 
             price = listing.css("div[class='uad-col uad-col-price'] span::text").get()
-            if price in ["Keresem", "Csere"]:
+            if price.lower() in ["keresem", "csere", "ingyenes", "ingyen"]:
                 continue
 
             if data_uadid in self.active_listings:
