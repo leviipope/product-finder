@@ -34,10 +34,10 @@ jobs:
         run: |
           uv run scrapy crawl hardver
 
-      - name: Run Scrapy script - verifer
+      - name: Run Scrapy script - verifier
         working-directory: ./backend/scraper
         run: |
-          uv run scrapy crawl verifer
+          uv run scrapy crawl verifier
 
       - name: Commit and Force Push DB Update
         run: |
