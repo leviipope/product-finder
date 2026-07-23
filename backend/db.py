@@ -307,6 +307,22 @@ def create_gpu_view():
             WHERE json_extract(l.category, '$[2]') = 'Videokártya';
         ''')
 
+def get_verification_queue_listings():
+    """Get all non-archived listings from the verification queue."""
+    with get_connection() as conn:
+        c = conn.cursor()
+        try:
+            c.execute("""
+                SELECT l.id, l.listing_url
+                FROM listings l
+                JOIN verification_queue v ON l.id = v.id
+                WHERE l.archived_at IS NULL
+            """)
+            rows = c.fetchall()
+            return [dict(row) for row in rows]
+        except Exception as e:
+            raise RuntimeError(f"\033[91m[DB ERROR] Failed to fetch verification queue: {e}\033[0m")
+
 def get_connection():
     try:
         if not os.path.exists(DATABASE_PATH):

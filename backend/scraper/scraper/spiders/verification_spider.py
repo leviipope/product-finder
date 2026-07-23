@@ -5,7 +5,7 @@ import sys
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from backend.db import get_connection
+from backend.db import get_verification_queue_listings
 
 
 class VerificationSpiderSpider(scrapy.Spider):
@@ -26,35 +26,22 @@ class VerificationSpiderSpider(scrapy.Spider):
         }
 
     def start_requests(self):
-        with get_connection() as conn:
-
-            conn.row_factory = lambda cursor, row: {col[0]: row[i] for i, col in enumerate(cursor.description)}
-            cursor = conn.cursor()
-            
-            try:
-                cursor.execute("""
-                    SELECT l.id, l.listing_url
-                    FROM listings l
-                    JOIN verification_queue v ON l.id = v.id
-                    WHERE l.archived_at IS NULL
-                """)
-                rows = cursor.fetchall()
-            except Exception as e:
-                self.logger.error(f"Failed to fetch listings for verification: {e}")
-                self.logger.error("Verification queue may be empty.")
-                return
-            
-            if not rows:
-                self.logger.info("No listings found in the verification queue.")
-                conn.close()
-                return
-            
-            for row in rows:
-                yield scrapy.Request(
-                    url=row['listing_url'],
-                    callback=self.parse,
-                    meta={'id': row['id'], 'listing_url': row['listing_url']},
-                )
+        try:
+            rows = get_verification_queue_listings()
+        except Exception as e:
+            self.logger.error(f"Failed to fetch listings for verification: {e}")
+            return
+        
+        if not rows:
+            self.logger.info("No listings found in the verification queue.")
+            return
+        
+        for row in rows:
+            yield scrapy.Request(
+                url=row['listing_url'],
+                callback=self.parse,
+                meta={'id': row['id'], 'listing_url': row['listing_url']},
+            )
 
     def parse(self, response):
         data_uadid = response.meta['id']

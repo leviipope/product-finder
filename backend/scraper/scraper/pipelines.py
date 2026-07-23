@@ -213,7 +213,7 @@ class SQLitePipeline:
             self.conn.close()
             return
 
-        spider.logger.info(f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Checking against {len(spider.categories_scraped)} scraped categories...\033[0m")
+        spider.logger.info(f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Scraped from {len(spider.categories_scraped)} categories.\033[0m")
         
         self.cursor.executemany(
             "INSERT INTO verification_queue (id) VALUES (?)",
