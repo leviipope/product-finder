@@ -26,21 +26,25 @@ class VerificationSpiderSpider(scrapy.Spider):
             'AUTOTHROTTLE_TARGET_CONCURRENCY': 2.0,
         }
 
-    def start_requests(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         try:
-            rows = get_verification_queue_listings()
-            self.logger.info(f"Fetched {len(rows)} listings for verification.")
-            # dev, format nicely
-            self.logger.info(f"Fetched listings: {json.dumps(rows, indent=2)}")
+            self.rows = get_verification_queue_listings() or []
+            self.logger.info(f"Fetched {len(self.rows)} listings for verification.")
+            if self.rows: # dev
+                self.logger.info(f"Fetched listings: {json.dumps(self.rows, indent=2)}")
+            else:
+                self.logger.warning("Verification queue is empty. No listings to verify.")
         except Exception as e:
             self.logger.error(f"Failed to fetch listings for verification: {e}")
-            return
-        
-        if not rows:
+            self.rows = []
+
+    def start_requests(self):      
+        if not self.rows:
             self.logger.info("No listings found in the verification queue.")
             return
         
-        for row in rows:
+        for row in self.rows:
             yield scrapy.Request(
                 url=row['listing_url'],
                 callback=self.parse,
