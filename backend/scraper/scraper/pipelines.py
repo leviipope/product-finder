@@ -14,9 +14,9 @@ from pathlib import Path
 import sys
 import json
 
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-import db
+from backend.db import get_connection
 
 
 class CleanDataPipeline:
@@ -77,7 +77,7 @@ class SQLitePipeline:
 
     def __init__(self):
         print("\033[94mSQLitePipeline: Initializing\033[0m")
-        self.conn = db.get_connection()
+        self.conn = get_connection()
         self.cursor = self.conn.cursor()
         self.active_listings = {}
         self.latest_prices = {}

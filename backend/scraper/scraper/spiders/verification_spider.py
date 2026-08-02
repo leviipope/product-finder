@@ -2,7 +2,7 @@ import scrapy
 from pathlib import Path
 import sys
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
+project_root = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(project_root))
 
 from backend.db import get_verification_queue_listings

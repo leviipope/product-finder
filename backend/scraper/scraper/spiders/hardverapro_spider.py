@@ -4,7 +4,7 @@ from datetime import datetime
 import sys
 from pathlib import Path
 
-project_root = Path(__file__).parent.parent.parent.parent.parent
+project_root = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(project_root))
 
 from backend.db import get_active_listing_ids, get_latest_prices
