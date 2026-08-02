@@ -49,7 +49,9 @@ class VerificationSpiderSpider(scrapy.Spider):
             self.logger.error(f"\033[91mFailed to fetch verification queue listings: {e}\033[0m")
             self.rows = []
 
-    def start_requests(self):      
+    def start_requests(self):
+        self.logger.info(f"\033[92mStarting verification for {len(self.rows)} listings.\033[0m")
+
         if not self.rows:
             self.logger.info("No listings found in the verification queue.")
             return
