@@ -73,6 +73,8 @@ class CleanDataPipeline:
         return item
     
 class SQLitePipeline:
+    MINIMUM_EXPECTED_ITEMS = 2000
+
     def __init__(self):
         print("\033[94mSQLitePipeline: Initializing\033[0m")
         self.conn = db.get_connection()
@@ -84,6 +86,28 @@ class SQLitePipeline:
         if spider.name == "hardver":
             self.active_listings = spider.active_listings
             self.latest_prices = spider.latest_prices
+
+    def _ensure_verification_table(self):
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS verification_queue (id INTEGER PRIMARY KEY)")
+        self.cursor.execute("DELETE FROM verification_queue")
+
+    def _insert_missing_ids(self, missing_ids):
+        if not missing_ids:
+            return
+        tuples = [(int(i),) for i in missing_ids]
+        self.cursor.executemany("INSERT INTO verification_queue (id) VALUES (?)", tuples)
+        self.conn.commit()
+
+    def _close_connection(self):
+        try:
+            self.conn.commit()
+        except Exception:
+            pass
+        finally:
+            try:
+                self.conn.close()
+            except Exception:
+                pass
 
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
@@ -191,34 +215,32 @@ class SQLitePipeline:
     def close_spider(self, spider):
         if spider.name != "hardver":
             spider.logger.info(f"\033[94mSQLitePipeline: Closing Spider {spider.name}...\033[0m")
-            self.conn.close()
+            self._close_connection()
             return
 
         spider.logger.info(f"\033[38;5;217mClosing hardver Spider...\033[0m")
 
-        MINIMUM_EXPECTED_ITEMS = 2000
-        if len(spider.seen_ids) < MINIMUM_EXPECTED_ITEMS:
-            spider.logger.error(f"\033[38;5;196m[ERROR] Crawl aborted early or blocked. Only scraped {len(spider.seen_ids)} items. Possible scraping issue. Aborting archiving logic to prevent false data loss.\033[0m")
-            self.conn.close()
+        if len(spider.seen_ids) < self.MINIMUM_EXPECTED_ITEMS:
+            spider.logger.error(
+                f"\033[38;5;196m[ERROR] Crawl aborted early or blocked. Only scraped {len(spider.seen_ids)} items. Possible scraping issue. Aborting archiving logic to prevent false data loss.\033[0m"
+            )
+            self._close_connection()
             return
 
-        missing_ids = list(set(spider.active_listings.keys()) - spider.seen_ids)
+        try:
+            active_keys = set(self.active_listings.keys())
+        except Exception:
+            active_keys = set()
+        missing_ids = list(active_keys - set(spider.seen_ids))
 
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS verification_queue (id INTEGER PRIMARY KEY)")
-        self.cursor.execute("DELETE FROM verification_queue")
+        self._ensure_verification_table()
 
         if not missing_ids:
             spider.logger.info(f"\033[38;5;82m[INFO] No missing IDs found. Database is up to date.\033[0m")
-            self.conn.commit()
-            self.conn.close()
+            self._close_connection()
             return
 
-        spider.logger.info(f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Scraped from {len(spider.categories_scraped)} categories.\033[0m")
-        
-        self.cursor.executemany(
-            "INSERT INTO verification_queue (id) VALUES (?)",
-            [(int(id),) for id in missing_ids]
-        )
+        spider.logger.info(f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Scraped from {len(getattr(spider, 'categories_scraped', []))} categories.\033[0m")
 
-        self.conn.commit()
-        self.conn.close()
+        self._insert_missing_ids(missing_ids)
+        self._close_connection()

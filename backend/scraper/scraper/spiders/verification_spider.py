@@ -1,6 +1,7 @@
 import scrapy
 from pathlib import Path
 import sys
+import json
 
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -28,6 +29,9 @@ class VerificationSpiderSpider(scrapy.Spider):
     def start_requests(self):
         try:
             rows = get_verification_queue_listings()
+            self.logger.info(f"Fetched {len(rows)} listings for verification.")
+            # dev, format nicely
+            self.logger.info(f"Fetched listings: {json.dumps(rows, indent=2)}")
         except Exception as e:
             self.logger.error(f"Failed to fetch listings for verification: {e}")
             return
