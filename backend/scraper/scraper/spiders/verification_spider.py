@@ -31,10 +31,6 @@ class VerificationSpiderSpider(scrapy.Spider):
         try:
             self.rows = get_verification_queue_listings() or []
             self.logger.info(f"Fetched {len(self.rows)} listings for verification.")
-            if self.rows: # dev
-                self.logger.info(f"Fetched listings: {json.dumps(self.rows, indent=2)}")
-            else:
-                self.logger.warning("Verification queue is empty. No listings to verify.")
         except Exception as e:
             self.logger.error(f"Failed to fetch listings for verification: {e}")
             self.rows = []
