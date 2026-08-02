@@ -227,11 +227,7 @@ class SQLitePipeline:
             self._close_connection()
             return
 
-        try:
-            active_keys = set(self.active_listings.keys())
-        except Exception:
-            active_keys = set()
-        missing_ids = list(active_keys - set(spider.seen_ids))
+        missing_ids = list(set(spider.active_listings.keys()) - spider.seen_ids)
 
         self._ensure_verification_table()
 
