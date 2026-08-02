@@ -1,4 +1,5 @@
 import scrapy
+import pandas as pd
 from pathlib import Path
 import sys
 
@@ -28,10 +29,25 @@ class VerificationSpiderSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         try:
-            self.rows = get_verification_queue_listings() or []
-            self.logger.info(f"\033[38;5;21mFetched {len(self.rows)} listings for verification.\033[0m")
+            raw_data = get_verification_queue_listings() or []
+            self.rows = []
+
+            if hasattr(raw_data, "to_dict"):
+                self.rows = raw_data.to_dict("records") # type: ignore
+            else:
+                for r in raw_data:
+                    if isinstance(r, (tuple, list)):
+                        self.rows.append({
+                            'id': r[0],
+                            'listing_url': r[1]
+                        })
+
+                    elif isinstance(r, dict):
+                        self.rows.append(r)
+
+            self.logger.info(f"\033[92mFetched {len(self.rows)} listings for verification.\033[0m")
         except Exception as e:
-            self.logger.error(f"\033[91mFailed to fetch listings for verification: {e}\033[0m")
+            self.logger.error(f"\033[91mFailed to fetch verification queue listings: {e}\033[0m")
             self.rows = []
 
     def start_requests(self):      
@@ -41,8 +57,8 @@ class VerificationSpiderSpider(scrapy.Spider):
         
         for row in self.rows:
             try:
-                url = row['listing_url']
-                item_id = row['id']
+                url = row.get('listing_url')
+                item_id = row.get('id')
 
                 if not url or not str(url).startswith("http"):
                     self.logger.error(f"\033[93mInvalid URL in DB: {url} (ID: {item_id})\033[0m")
