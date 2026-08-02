@@ -1,7 +1,6 @@
 import scrapy
 from pathlib import Path
 import sys
-import json
 
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -30,9 +29,9 @@ class VerificationSpiderSpider(scrapy.Spider):
         super().__init__(*args, **kwargs)
         try:
             self.rows = get_verification_queue_listings() or []
-            self.logger.info(f"Fetched {len(self.rows)} listings for verification.")
+            self.logger.info(f"\033[38;5;21mFetched {len(self.rows)} listings for verification.\033[0m")
         except Exception as e:
-            self.logger.error(f"Failed to fetch listings for verification: {e}")
+            self.logger.error(f"\033[91mFailed to fetch listings for verification: {e}\033[0m")
             self.rows = []
 
     def start_requests(self):      
@@ -41,11 +40,24 @@ class VerificationSpiderSpider(scrapy.Spider):
             return
         
         for row in self.rows:
-            yield scrapy.Request(
-                url=row['listing_url'],
-                callback=self.parse,
-                meta={'id': row['id'], 'listing_url': row['listing_url']},
-            )
+            try:
+                url = row['listing_url']
+                item_id = row['id']
+
+                if not url or not str(url).startswith("http"):
+                    self.logger.error(f"\033[93mInvalid URL in DB: {url} (ID: {item_id})\033[0m")
+                    continue
+
+                yield scrapy.Request(
+                    url=url,
+                    callback=self.parse,
+                    meta={'id': item_id, 'listing_url': url},
+                )
+
+            except Exception as e:
+                self.logger.error(f"\033[91mCRASH in start_requests! Row type: {type(row)} | Data: {row}\033[0m")
+                self.logger.error(f"\033[91mError: {type(e).__name__} - {e}\033[0m")
+                continue
 
     def parse(self, response):
         data_uadid = response.meta['id']
