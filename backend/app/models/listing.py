@@ -33,3 +33,35 @@ class Listing(Base):
     iced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     listed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+class EnrichedLaptopListing(Base):
+    __tablename__ = "laptop_view"
+
+    site: Mapped[str] = mapped_column(String, primary_key=True)
+    listing_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    brand: Mapped[Optional[str]] = mapped_column(String)
+    model: Mapped[Optional[str]] = mapped_column(String)
+    title: Mapped[str] = mapped_column(String, index=True)
+    price: Mapped[float] = mapped_column(Integer, index=True)
+    currency: Mapped[str] = mapped_column(String, default="HUF")
+    iced_status: Mapped[bool] = mapped_column(Boolean, default=False)
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    cpu_brand: Mapped[Optional[str]] = mapped_column(String)
+    cpu_model: Mapped[Optional[str]] = mapped_column(String)
+    gpu_brand: Mapped[Optional[str]] = mapped_column(String)
+    gpu_model: Mapped[Optional[str]] = mapped_column(String)
+    gpu_type: Mapped[Optional[str]] = mapped_column(String)
+    ram: Mapped[Optional[str]] = mapped_column(String)
+    storage_size: Mapped[Optional[str]] = mapped_column(String)
+    storage_type: Mapped[Optional[str]] = mapped_column(String)
+    resolution: Mapped[Optional[str]] = mapped_column(String)
+    screen_size: Mapped[Optional[str]] = mapped_column(String)
+    panel_type: Mapped[Optional[str]] = mapped_column(String)
+    refresh_rate: Mapped[Optional[str]] = mapped_column(String)
+    listing_url: Mapped[str] = mapped_column(String)
+    location: Mapped[str] = mapped_column(String, index=True)
+    listed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    scraped_at: Mapped[datetime] = mapped_column(DateTime)
+
+    
