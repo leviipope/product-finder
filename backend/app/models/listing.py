@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Integer, Boolean, DateTime, Text
+from sqlalchemy import String, Integer, Boolean, DateTime, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -25,9 +25,9 @@ class Listing(Base):
     description: Mapped[str] = mapped_column(Text)
     scraped_at: Mapped[datetime] = mapped_column(DateTime)
 
-    category: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(JSON)
     delivery_options: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    price_history: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    price_history: Mapped[Optional[str]] = mapped_column(JSON, nullable=True)
 
     img: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     iced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

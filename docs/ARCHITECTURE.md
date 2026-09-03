@@ -27,10 +27,12 @@ flowchart LR
     subgraph SearchGroup["Saved searches"]
         direction TB
         AddSearch["POST /searches"]
-        ManageSearch["DELETE search<br/>PATCH deactivate"]
+        ViewSearches["GET /searches<br/>View all searches"]
+        ManageSearch["DELETE search<br/>PATCH activate/deactivate"]
         SearchDB[("searches table")]
         Notifier["Email notifier"]
         AddSearch --> SearchDB
+        ViewSearches --> SearchDB
         ManageSearch --> SearchDB
         SearchDB --> Notifier
     end
@@ -75,7 +77,7 @@ flowchart LR
     classDef data fill:#f3e8ef,stroke:#8f4567,color:#482238;
     classDef process fill:#eef5e8,stroke:#4f772d,color:#243b16;
     class Frontend client;
-    class API,AddSearch,ManageSearch,LaptopAPI,GPUAPI,DetailAPI,OriginalAPI,PriceAPI,StartEnrichment api;
+    class API,AddSearch,ViewSearches,ManageSearch,LaptopAPI,GPUAPI,DetailAPI,OriginalAPI,PriceAPI,StartEnrichment api;
     class SearchDB,LaptopData,GPUData,ListingData,EnrichedTables data;
     class Notifier,Ollama process;
 ```
@@ -85,8 +87,12 @@ flowchart LR
 | Method | Endpoint | Purpose | Database action |
 | --- | --- | --- | --- |
 | `POST` | `/api/v1/searches` | Add a saved search. | Insert a row into `searches` with `email`, `search_name`, `category`, `filters`, and `is_active = true`. |
+| `GET` | `/api/v1/searches` | View all saved searches. | Read all rows from `searches`, including both active and inactive searches, and deserialize the `filters` JSON string. |
 | `DELETE` | `/api/v1/searches/{search_id}` | Remove a saved search permanently. | Delete the matching row from `searches`. |
+| `PATCH` | `/api/v1/searches/{search_id}/activate` | Resume a saved search for notifications while retaining it. | Set `is_active = true`. |
 | `PATCH` | `/api/v1/searches/{search_id}/deactivate` | Stop a search from being used for notifications while retaining it. | Set `is_active = false`. |
+
+The list endpoint should return saved searches in a stable order, such as `search_id ASC`, and support pagination with `skip` and `limit` query parameters.
 
 #### Create Search Request
 
@@ -118,7 +124,7 @@ flowchart LR
 }
 ```
 
-The API should return `201 Created` when a search is added, `204 No Content` after a successful delete or deactivation, and `404 Not Found` when `search_id` does not exist. Deactivation should be idempotent: deactivating an already inactive search succeeds without changing its meaning.
+The API should return `201 Created` when a search is added, `204 No Content` after a successful delete, activation, or deactivation, and `404 Not Found` when `search_id` does not exist. Activation and deactivation should be idempotent: activating an already active search or deactivating an already inactive search succeeds without changing its meaning. Use explicit activate and deactivate endpoints rather than a toggle so retries and concurrent requests remain predictable.
 
 ### Listing APIs
 

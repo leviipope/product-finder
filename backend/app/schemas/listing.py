@@ -1,7 +1,5 @@
-import json
 from datetime import datetime
-from typing import Any
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel
 
 class ListingFilterParams(BaseModel):
     city: str | None = None
@@ -29,13 +27,3 @@ class ListingResponse(BaseModel):
     description: str
     listed_at: datetime | None
     scraped_at: datetime
-
-    @field_validator("category", "price_history", mode="before")
-    @classmethod
-    def parse_json_string(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError:
-                return []
-        return value
