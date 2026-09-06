@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Integer, Boolean, DateTime, Text, JSON
+from sqlalchemy import String, Integer, Boolean, DateTime, Text, JSON, Float
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -52,13 +52,13 @@ class EnrichedLaptopListing(Base):
     gpu_brand: Mapped[Optional[str]] = mapped_column(String)
     gpu_model: Mapped[Optional[str]] = mapped_column(String)
     gpu_type: Mapped[Optional[str]] = mapped_column(String)
-    ram: Mapped[Optional[str]] = mapped_column(String)
-    storage_size: Mapped[Optional[str]] = mapped_column(String)
+    ram_gb: Mapped[Optional[int]] = mapped_column(Integer)
+    storage_size_gb: Mapped[Optional[int]] = mapped_column(Integer)
     storage_type: Mapped[Optional[str]] = mapped_column(String)
     resolution: Mapped[Optional[str]] = mapped_column(String)
-    screen_size: Mapped[Optional[str]] = mapped_column(String)
+    screen_size_inch: Mapped[Optional[float]] = mapped_column(Float)
     panel_type: Mapped[Optional[str]] = mapped_column(String)
-    refresh_rate: Mapped[Optional[str]] = mapped_column(String)
+    refresh_rate_hz: Mapped[Optional[int]] = mapped_column(Integer)
     listing_url: Mapped[str] = mapped_column(String)
     location: Mapped[str] = mapped_column(String, index=True)
     listed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)

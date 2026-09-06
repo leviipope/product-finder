@@ -28,7 +28,7 @@ def get_non_enriched_laptop_ids() -> dict[str, list[int]]:
         c.execute("""
             SELECT id FROM listings 
             WHERE product_type = 'Notebook' 
-            AND id NOT IN (SELECT listing_id FROM enriched_specs_laptops)
+            AND id NOT IN (SELECT listing_id FROM enriched_laptops)
         """)
         results = c.fetchall()
 
@@ -179,27 +179,27 @@ def create_listings_table():
             )
         ''')
 
-def create_enriched_specs_laptops_table():
+def create_enriched_laptops_table():
     with get_connection() as conn:
         c = conn.cursor()
 
         c.execute('''
-            CREATE TABLE IF NOT EXISTS enriched_specs_laptops (
+            CREATE TABLE IF NOT EXISTS enriched_laptops (
                 site TEXT NOT NULL,
                 listing_id INT NOT NULL,
                 enriched_model TEXT,
                 enriched_brand TEXT,
                 resolution TEXT,
-                screen_size TEXT,
+                screen_size_inch REAL,
                 panel_type TEXT,
-                refresh_rate TEXT,
+                refresh_rate_hz INTEGER,
                 cpu_brand TEXT,
                 cpu_model TEXT,
                 gpu_brand TEXT,
                 gpu_model TEXT,
                 gpu_type TEXT,
-                ram TEXT,
-                storage_size TEXT,
+                ram_gb INTEGER,
+                storage_size_gb INTEGER,
                 storage_type TEXT,
                 
                 PRIMARY KEY (site, listing_id),
@@ -219,7 +219,7 @@ def create_enriched_gpus_table():
                 listing_id INT NOT NULL,
                 enriched_brand TEXT,
                 enriched_model TEXT,
-                vram INTEGER,
+                vram_gb INTEGER,
                                 
                 PRIMARY KEY (site, listing_id),
                 FOREIGN KEY (site, listing_id) 
@@ -264,19 +264,19 @@ def create_laptop_view():
                 e.gpu_brand,
                 e.gpu_model,
                 e.gpu_type,
-                e.ram,
-                e.storage_size,
+                e.ram_gb,
+                e.storage_size_gb,
                 e.resolution,
-                e.screen_size,
+                e.screen_size_inch,
                 e.panel_type,
-                e.refresh_rate,
+                e.refresh_rate_hz,
                 e.storage_type,
                 l.listing_url,
                 l.location,
                 l.listed_at,
                 l.scraped_at
             FROM listings l
-            JOIN enriched_specs_laptops e
+            JOIN enriched_laptops e
             ON l.site = e.site AND l.id = e.listing_id
             WHERE l.product_type = 'Notebook';
         ''')
@@ -292,7 +292,7 @@ def create_gpu_view():
                 l.id AS listing_id,
                 e.enriched_brand AS brand,
                 e.enriched_model AS model,
-                e.vram,
+                e.vram_gb,
                 l.price,
                 l.currency,
                 l.iced_status,

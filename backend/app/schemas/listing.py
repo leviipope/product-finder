@@ -41,17 +41,17 @@ class EnrichedLaptopFilterParams(BaseModel):
     gpu_brand: str | None = None
     gpu_model: str | None = None
     gpu_type: str | None = None
-    min_ram: str | None = None
-    max_ram: str | None = None
-    min_storage_size: str | None = None
-    max_storage_size: str | None = None
+    min_ram_gb: int | None = None
+    max_ram_gb: int | None = None
+    min_storage_size_gb: int | None = None
+    max_storage_size_gb: int | None = None
     storage_type: str | None = None
     resolution: str | None = None
-    min_screen_size: str | None = None
-    max_screen_size: str | None = None
+    min_screen_size_inch: float | None = None
+    max_screen_size_inch: float | None = None
     panel_type: str | None = None
-    min_refresh_rate: str | None = None
-    max_refresh_rate: str | None = None
+    min_refresh_rate_hz: int | None = None
+    max_refresh_rate_hz: int | None = None
     location: str | None = None
     skip: int = 0
     limit: int = 20
@@ -71,13 +71,13 @@ class EnrichedLaptopListingResponse(BaseModel):
     gpu_brand: str | None
     gpu_model: str | None
     gpu_type: str | None
-    ram: str | None
-    storage_size: str | None
+    ram_gb: int | None
+    storage_size_gb: int | None
     storage_type: str | None
     resolution: str | None
-    screen_size: str | None
+    screen_size_inch: float | None
     panel_type: str | None
-    refresh_rate: str | None
+    refresh_rate_hz: int | None
     listing_url: str
     location: str
     listed_at: datetime | None
