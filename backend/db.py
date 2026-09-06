@@ -258,6 +258,7 @@ def create_laptop_view():
                 l.price,
                 l.currency,
                 l.iced_status,
+                l.iced_at,
                 l.archived_at,
                 e.cpu_brand,
                 e.cpu_model,
@@ -272,6 +273,12 @@ def create_laptop_view():
                 e.refresh_rate_hz,
                 e.storage_type,
                 l.listing_url,
+                l.img as img_url,
+                l.seller,
+                l.seller_rating,
+                l.seller_profile_url,
+                l.delivery_options,
+                l.description,
                 l.location,
                 l.listed_at,
                 l.scraped_at
@@ -294,10 +301,19 @@ def create_gpu_view():
                 e.enriched_model AS model,
                 e.vram_gb,
                 l.price,
+                l.title,
                 l.currency,
                 l.iced_status,
+                l.iced_at,
+                l.price_history,
                 l.archived_at,
                 l.listing_url,
+                l.img as img_url,
+                l.seller,
+                l.seller_rating,
+                l.seller_profile_url,
+                l.delivery_options,
+                l.description,
                 l.location,
                 l.listed_at,
                 l.scraped_at
@@ -335,7 +351,16 @@ def get_connection():
         raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
 
 def main():
-    pass
+    # drop laptop view and create it again
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("DROP VIEW IF EXISTS laptop_view")
+        create_laptop_view()
+        print("✅ Laptop view created successfully")
+
+        c.execute("DROP VIEW IF EXISTS gpu_view")
+        create_gpu_view()
+        print("✅ GPU view created successfully")
 
 
 if __name__ == "__main__":

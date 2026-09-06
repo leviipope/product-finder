@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.models.listing import Listing, EnrichedLaptopListing
-from app.schemas.listing import ListingFilterParams, EnrichedLaptopFilterParams
+from app.models.listing import EnrichedGPUListing, Listing, EnrichedLaptopListing
+from app.schemas.listing import EnrichedGPUListingFilterParams, ListingFilterParams, EnrichedLaptopFilterParams
 
 def get_listings(db: Session, params: ListingFilterParams) -> list[Listing]:
     stmt = select(Listing)
@@ -18,6 +18,14 @@ def get_listings(db: Session, params: ListingFilterParams) -> list[Listing]:
     stmt = stmt.offset(params.skip).limit(params.limit)
 
     return list(db.scalars(stmt).all())
+
+def get_enriched_laptop_listing(db: Session, site: str, listing_id: int) -> EnrichedLaptopListing | None:
+    stmt = select(EnrichedLaptopListing).where(
+        EnrichedLaptopListing.site == site,
+        EnrichedLaptopListing.listing_id == listing_id
+    )
+
+    return db.scalars(stmt).first()
 
 def get_enriched_laptop_listings(db: Session, params: EnrichedLaptopFilterParams) -> list[EnrichedLaptopListing]:
     stmt = select(EnrichedLaptopListing)
@@ -74,3 +82,51 @@ def get_enriched_laptop_listings(db: Session, params: EnrichedLaptopFilterParams
     stmt = stmt.offset(params.skip).limit(params.limit)
 
     return list(db.scalars(stmt).all())
+
+def get_enriched_gpu_listing(db: Session, site: str, listing_id: int) -> EnrichedGPUListing | None:
+    stmt = select(EnrichedGPUListing).where(
+        EnrichedGPUListing.site == site,
+        EnrichedGPUListing.listing_id == listing_id
+    )
+
+    return db.scalars(stmt).first()
+
+def get_enriched_gpu_listings(db: Session, params: EnrichedGPUListingFilterParams) -> list[EnrichedGPUListing]:
+    stmt = select(EnrichedGPUListing)
+
+    if params.site:
+        stmt = stmt.where(EnrichedGPUListing.site == params.site)
+    if params.brand:
+        stmt = stmt.where(EnrichedGPUListing.brand == params.brand)
+    if params.model:
+        stmt = stmt.where(EnrichedGPUListing.model.ilike(f"%{params.model}%"))
+    if params.min_price is not None:
+        stmt = stmt.where(EnrichedGPUListing.price >= params.min_price)
+    if params.max_price is not None:
+        stmt = stmt.where(EnrichedGPUListing.price <= params.max_price)
+    if params.min_vram_gb is not None:
+        stmt = stmt.where(EnrichedGPUListing.vram_gb >= params.min_vram_gb)
+    if params.max_vram_gb is not None:
+        stmt = stmt.where(EnrichedGPUListing.vram_gb <= params.max_vram_gb)
+    if params.iced_status is not None:
+        stmt = stmt.where(EnrichedGPUListing.iced_status == params.iced_status)
+
+    stmt = stmt.offset(params.skip).limit(params.limit)
+
+    return list(db.scalars(stmt).all())
+
+def get_price_history(db: Session, site: str, listing_id: int) -> list[int] | None:
+    stmt = select(Listing).where(
+        Listing.site == site,
+        Listing.id == listing_id
+    )
+
+    listing = db.scalars(stmt).first()
+
+    if listing is None:
+        return None
+
+    if listing.price_history is None:
+        return []
+
+    return list(listing.price_history)
