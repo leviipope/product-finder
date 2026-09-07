@@ -14,16 +14,16 @@ class LaptopSpecs(BaseModel):
         description="No other text or marketing terms allowed. If unknown, use null."
     )
     
-    screen_size_inches: Union[float, None] = Field(
-        description="Diagonal screen size in inches (e.g., 15.6, 13.3). Return as a clean number. Use null if unknown."
+    screen_size_inch: Union[float, None] = Field(
+        description="Diagonal screen size in inches (e.g., 15.6, 13.3). Return as a clean float. Use null if unknown."
     )
     
     panel_type: Union[Literal['IPS', 'OLED', 'TN', 'VA'], None] = Field(
         description="Screen panel technology. Must be one of: 'IPS', 'OLED', 'TN', 'VA'. Use null if unknown."
     )
     
-    refresh_rate: Union[float, None] = Field( 
-        description="Screen refresh rate in Hz (e.g., 144.0, 60.0). Return as a clean float. Use null if unknown."
+    refresh_rate_hz: Union[int, None] = Field( 
+        description="Screen refresh rate in Hz (e.g., 144, 60). Return as a clean integer. Use null if unknown."
     )
     
     cpu_brand: str
@@ -41,7 +41,7 @@ class LaptopSpecs(BaseModel):
     )
     
     storage_size_gb: Union[int, None] = Field(
-        description="Total storage capacity (summed) in GB (e.g., 512, 1256). Return as a clean integer. Use null if unknown."
+        description="Total storage capacity in GB (e.g., 512, 1256). Return as a clean integer. Use null if unknown."
     )
 
 class GPUSpecs(BaseModel):
@@ -94,9 +94,9 @@ def enrich_laptop(id: int, site: str, data: dict):
     brand = data.get("brand")
     model = data.get("model")
     resolution = data.get("resolution")
-    screen_size_inches = data.get("screen_size_inches")
+    screen_size_inch = data.get("screen_size_inch")
     panel_type = data.get("panel_type")
-    refresh_rate = data.get("refresh_rate")
+    refresh_rate_hz = data.get("refresh_rate_hz")
     cpu_brand = data.get("cpu_brand")
     cpu_model = data.get("cpu_model")
     gpu_brand = data.get("gpu_brand")
@@ -111,13 +111,13 @@ def enrich_laptop(id: int, site: str, data: dict):
 
     c.execute(
         '''
-        INSERT INTO enriched_specs_laptops (
-            site, listing_id, enriched_brand, enriched_model, resolution, screen_size, panel_type, refresh_rate,
-            cpu_brand, cpu_model, gpu_brand, gpu_model, gpu_type, ram, storage_size, storage_type
+        INSERT INTO enriched_laptops (
+            site, listing_id, enriched_brand, enriched_model, resolution, screen_size_inch, panel_type, refresh_rate_hz,
+            cpu_brand, cpu_model, gpu_brand, gpu_model, gpu_type, ram_gb, storage_size_gb, storage_type
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',
         (
-            site, id, brand, model, resolution, screen_size_inches, panel_type, refresh_rate,
+            site, id, brand, model, resolution, screen_size_inch, panel_type, refresh_rate_hz,
             cpu_brand, cpu_model, gpu_brand, gpu_model, gpu_type, ram_gb, storage_size_gb, storage_type
         )
     )
@@ -138,7 +138,7 @@ def enrich_gpu(id: int, site: str, data: dict):
         c.execute(
             '''
             INSERT INTO enriched_gpus (
-                site, listing_id, enriched_brand, enriched_model, vram
+                site, listing_id, enriched_brand, enriched_model, vram_gb
             ) VALUES (?, ?, ?, ?, ?)
             ''',
             (
