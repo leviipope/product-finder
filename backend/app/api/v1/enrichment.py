@@ -21,9 +21,12 @@ def start_local_enrichment(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(enrichment_service.run_local_enrichment)
 
+    job_status = enrichment_service.get_enrichment_status()
+
     return {
         "run_id": run_id,
         "status": "started",
+        "estimated_runtime": job_status["estimated_runtime"],
     }
 
 @router.get("/local/status")

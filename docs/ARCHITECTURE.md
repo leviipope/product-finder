@@ -161,11 +161,11 @@ The listing detail endpoint should return `404 Not Found` for a missing listing.
 
 | Method | Endpoint | Purpose | Current implementation |
 | --- | --- | --- | --- |
-| `POST` | `/api/v1/enrichment/local` | Start local LLM enrichment for all currently unenriched supported listings. | Checks that Ollama is reachable, then starts the enrichment job with FastAPI `BackgroundTasks`. |
-| `GET` | `/api/v1/enrichment/local/status` | Check the current enrichment job. | Returns the in-memory job status, including `idle`, `running`, `completed`, or `failed`. |
+| `POST` | `/api/v1/enrichment/local` | Start local LLM enrichment for all currently unenriched supported listings. | Checks that Ollama is reachable, starts the job with FastAPI `BackgroundTasks`, and returns an estimated duration. |
+| `GET` | `/api/v1/enrichment/local/status` | Check the current enrichment job. | Returns the in-memory job status, including `idle`, `running`, `completed`, or `failed`, plus the estimate. |
 | `POST` | `/api/v1/enrichment/local/cancel` | Request cancellation of the active enrichment job. | Accepts the active `run_id` and cooperatively stops processing before the next listing or retry. |
 
-The start endpoint returns `202 Accepted` with a run identifier because enrichment invokes Ollama and may take a long time. It returns `503 Service Unavailable` when Ollama cannot be reached, and `409 Conflict` when another enrichment job is already running. A lightweight in-memory job state is sufficient for this local quality-of-life feature; no external queue or worker system is needed.
+The start endpoint returns `202 Accepted` with a run identifier because enrichment invokes Ollama and may take a long time. It also returns `estimated_runtime`, calculated as `(remaining laptops * 6) + (remaining GPUs * 4)`. The same estimate should be included in status responses. It returns `503 Service Unavailable` when Ollama cannot be reached, and `409 Conflict` when another enrichment job is already running. A lightweight in-memory job state is sufficient for this local quality-of-life feature; no external queue or worker system is needed.
 
 The background job should call the existing orchestration in `enrichment.py`:
 
@@ -180,7 +180,8 @@ Manual execution of `enrichment.py` remains a fallback. The API is intended for 
 ```json
 {
     "run_id": "enrichment-20260903-001",
-    "status": "started"
+    "status": "started",
+    "estimated_runtime": 1240
 }
 ```
 
@@ -190,6 +191,7 @@ Example status response:
 {
     "run_id": "enrichment-20260903-001",
     "status": "running",
+    "estimated_runtime": 1240,
     "error": null
 }
 ```
