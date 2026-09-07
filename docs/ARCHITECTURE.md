@@ -163,7 +163,7 @@ The listing detail endpoint should return `404 Not Found` for a missing listing.
 | --- | --- | --- | --- |
 | `POST` | `/api/v1/enrichment/local` | Start local LLM enrichment for all currently unenriched supported listings. | Checks that Ollama is reachable, starts the job with FastAPI `BackgroundTasks`, and returns an estimated duration. |
 | `GET` | `/api/v1/enrichment/local/status` | Check the current enrichment job. | Returns the in-memory job status, including `idle`, `running`, `completed`, or `failed`, plus the estimate. |
-| `POST` | `/api/v1/enrichment/local/cancel` | Request cancellation of the active enrichment job. | Accepts the active `run_id` and cooperatively stops processing before the next listing or retry. |
+| `POST` | `/api/v1/enrichment/local/cancel` | Request cancellation of the active enrichment job. | Accepts the active `run_id`, returns enriched counts by product type, and cooperatively stops processing before the next listing or retry. |
 
 The start endpoint returns `202 Accepted` with a run identifier because enrichment invokes Ollama and may take a long time. It also returns `estimated_runtime`, calculated as `(remaining laptops * 6) + (remaining GPUs * 4)`. The same estimate should be included in status responses. It returns `503 Service Unavailable` when Ollama cannot be reached, and `409 Conflict` when another enrichment job is already running. A lightweight in-memory job state is sufficient for this local quality-of-life feature; no external queue or worker system is needed.
 
@@ -173,7 +173,7 @@ The background job should call the existing orchestration in `enrichment.py`:
 2. Run `local_enrichment()` for the returned IDs.
 3. Run the notifier if notification processing remains part of the manual workflow.
 
-Cancellation should be cooperative: the cancel endpoint returns `202 Accepted`, and the job checks its cancellation flag between listings and retries. A synchronous Ollama request already in progress is allowed to finish; completed listings remain saved, and the notifier is skipped after cancellation. The endpoint should return `404 Not Found` for an unknown `run_id` and `409 Conflict` when no job is running.
+Cancellation should be cooperative: the cancel endpoint returns `202 Accepted` with an `enriched_counts` snapshot for laptops and GPUs, and the job checks its cancellation flag between listings and retries. Counts increase only after a listing is successfully written to its enriched table. A synchronous Ollama request already in progress is allowed to finish; completed listings remain saved, and the notifier is skipped after cancellation. The endpoint should return `404 Not Found` for an unknown `run_id` and `409 Conflict` when no job is running.
 
 Manual execution of `enrichment.py` remains a fallback. The API is intended for a single local backend process, and its in-memory status is reset when that process restarts. Forcefully terminating the background task is not supported.
 
@@ -192,7 +192,24 @@ Example status response:
     "run_id": "enrichment-20260903-001",
     "status": "running",
     "estimated_runtime": 1240,
+    "enriched_counts": {
+        "laptop": 12,
+        "gpu": 4
+    },
     "error": null
+}
+```
+
+Example cancellation response:
+
+```json
+{
+    "run_id": "enrichment-20260903-001",
+    "status": "cancellation_requested",
+    "enriched_counts": {
+        "laptop": 12,
+        "gpu": 4
+    }
 }
 ```
 
@@ -207,4 +224,5 @@ Example status response:
 - Move the callable enrichment orchestration behind an application service so the API does not import the script entry point directly. The current implementation uses FastAPI `BackgroundTasks` so the start request returns immediately.
 - Add a small in-memory enrichment job state and an Ollama availability check before starting. Do not add Celery, Redis, or another external queue for the first version.
 - Add an in-memory cancellation event to the enrichment job state and expose `POST /api/v1/enrichment/local/cancel` with `run_id` validation.
+- Track successfully enriched listings by product type and return a count snapshot from the cancel endpoint.
 - Add ownership or authorization checks before exposing search deletion, since the current table has no user identifier beyond `email`.

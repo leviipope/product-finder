@@ -41,7 +41,9 @@ def cancel_local_enrichment(run_id: str):
             detail="No enrichment job is currently running."
         )
 
-    if not enrichment_service.cancel_enrichment(run_id):
+    enriched_counts = enrichment_service.cancel_enrichment(run_id)
+
+    if enriched_counts is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Unknown enrichment run_id."
@@ -50,5 +52,6 @@ def cancel_local_enrichment(run_id: str):
     return {
         "run_id": run_id,
         "status": "cancellation_requested",
+        "enriched_counts": enriched_counts,
     }
             

@@ -148,7 +148,12 @@ def enrich_gpu(id: int, site: str, data: dict):
 
     print(f"✅ Listing {id} enriched, updated in database")
 
-def local_enrichment(non_enriched_dict, cancel_event=None):
+def local_enrichment(
+        non_enriched_dict,
+        cancel_event=None,
+        on_enriched=None
+    ):
+
     MAX_RETRIES = 3
     start_total = time.time()
 
@@ -193,6 +198,9 @@ def local_enrichment(non_enriched_dict, cancel_event=None):
                         enrich_laptop(id, site, data)
                     elif product_type == "gpu":
                         enrich_gpu(id, site, data)
+
+                    if on_enriched:
+                        on_enriched(product_type)
 
                     elapsed_attempt = time.time() - start_attempt
                     print(f"✅ Attempt {attempt} succeeded in {elapsed_attempt:.2f}s")
