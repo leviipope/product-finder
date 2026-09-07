@@ -163,6 +163,7 @@ The listing detail endpoint should return `404 Not Found` for a missing listing.
 | --- | --- | --- | --- |
 | `POST` | `/api/v1/enrichment/local` | Start local LLM enrichment for all currently unenriched supported listings. | Checks that Ollama is reachable, then starts the enrichment job with FastAPI `BackgroundTasks`. |
 | `GET` | `/api/v1/enrichment/local/status` | Check the current enrichment job. | Returns the in-memory job status, including `idle`, `running`, `completed`, or `failed`. |
+| `POST` | `/api/v1/enrichment/local/cancel` | Request cancellation of the active enrichment job. | Accepts the active `run_id` and cooperatively stops processing before the next listing or retry. |
 
 The start endpoint returns `202 Accepted` with a run identifier because enrichment invokes Ollama and may take a long time. It returns `503 Service Unavailable` when Ollama cannot be reached, and `409 Conflict` when another enrichment job is already running. A lightweight in-memory job state is sufficient for this local quality-of-life feature; no external queue or worker system is needed.
 
@@ -172,9 +173,9 @@ The background job should call the existing orchestration in `enrichment.py`:
 2. Run `local_enrichment()` for the returned IDs.
 3. Run the notifier if notification processing remains part of the manual workflow.
 
-The frontend should provide a button that calls the start endpoint, disables itself while the job is running, and polls the status endpoint periodically. If Ollama is unavailable, the API should return a clear error and the frontend should tell the user to start Ollama locally, for example with `ollama serve`. The browser should not attempt to open Ollama automatically because launching local applications is platform-dependent and unsafe for a web page.
+Cancellation should be cooperative: the cancel endpoint returns `202 Accepted`, and the job checks its cancellation flag between listings and retries. A synchronous Ollama request already in progress is allowed to finish; completed listings remain saved, and the notifier is skipped after cancellation. The endpoint should return `404 Not Found` for an unknown `run_id` and `409 Conflict` when no job is running.
 
-Manual execution of `enrichment.py` remains a fallback. The API is intended for a single local backend process, and its in-memory status is reset when that process restarts. Cancellation is not currently exposed; stopping an active run requires stopping the backend process, and already-completed listings remain saved.
+Manual execution of `enrichment.py` remains a fallback. The API is intended for a single local backend process, and its in-memory status is reset when that process restarts. Forcefully terminating the background task is not supported.
 
 ```json
 {
@@ -203,4 +204,5 @@ Example status response:
 - Keep enriched and original listing data as separate response views, rather than overwriting the scraped row.
 - Move the callable enrichment orchestration behind an application service so the API does not import the script entry point directly. The current implementation uses FastAPI `BackgroundTasks` so the start request returns immediately.
 - Add a small in-memory enrichment job state and an Ollama availability check before starting. Do not add Celery, Redis, or another external queue for the first version.
+- Add an in-memory cancellation event to the enrichment job state and expose `POST /api/v1/enrichment/local/cancel` with `run_id` validation.
 - Add ownership or authorization checks before exposing search deletion, since the current table has no user identifier beyond `email`.

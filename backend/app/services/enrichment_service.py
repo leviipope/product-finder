@@ -3,9 +3,10 @@ from db import get_non_enriched_ids_by_product_type
 from enrichment import local_enrichment
 from notifier import run_notifier
 from datetime import datetime, timezone
-from threading import Lock
+from threading import Lock, Event
 from uuid import uuid4
 
+_cancel_event = Event()
 _job_lock = Lock()
 _job_status = {
     "run_id": None,
@@ -18,9 +19,14 @@ _job_status = {
 def run_local_enrichment():
     try:
         non_enriched_dict = get_non_enriched_ids_by_product_type()
-        local_enrichment(non_enriched_dict)
-        run_notifier(non_enriched_dict)
-        _job_status["status"] = "completed"
+        was_canceled = local_enrichment(non_enriched_dict, _cancel_event)
+
+        if was_canceled or _cancel_event.is_set():
+            _job_status["status"] = "canceled"
+        else:
+            run_notifier(non_enriched_dict)
+            _job_status["status"] = "completed"
+
     except Exception as e:
         _job_status["status"] = "failed"
         _job_status["error"] = str(e)
@@ -35,6 +41,8 @@ def get_enrichment_status():
 def try_start_enrichment() -> str | None:
     if not _job_lock.acquire(blocking=False):
         return None
+
+    _cancel_event.clear()
 
     run_id = f"enrichment_{uuid4().hex[:8]}"
     _job_status.update(
@@ -54,4 +62,14 @@ def is_ollama_available() -> bool:
         return True
     except Exception:
         return False
+
+def cancel_enrichment(run_id: str) -> bool:
+    if _job_status["run_id"] != run_id:
+        return False
+
+    if _job_status["status"] != "running":
+        return False
+
+    _cancel_event.set()
+    return True
 

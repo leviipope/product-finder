@@ -148,11 +148,14 @@ def enrich_gpu(id: int, site: str, data: dict):
 
     print(f"✅ Listing {id} enriched, updated in database")
 
-def local_enrichment(non_enriched_dict):
+def local_enrichment(non_enriched_dict, cancel_event=None):
     MAX_RETRIES = 3
     start_total = time.time()
 
     for product_type, ids in non_enriched_dict.items():
+        if cancel_event and cancel_event.is_set():
+            return True
+
         print(f"\n🔷 Processing product type: {product_type.upper()}")
         
         if not ids:
@@ -160,10 +163,16 @@ def local_enrichment(non_enriched_dict):
             continue
 
         for id in ids:
+            if cancel_event and cancel_event.is_set():
+                return True
+            
             print(f"\n🔹 Processing listing {id}")
             start_listing = time.time()
 
             for attempt in range(1, MAX_RETRIES + 1):
+                if cancel_event and cancel_event.is_set():
+                    return True
+
                 start_attempt = time.time()
                 try:
 
@@ -199,6 +208,8 @@ def local_enrichment(non_enriched_dict):
 
     elapsed_total = time.time() - start_total
     print(f"\n🏁 Total runtime: {elapsed_total:.2f}s")
+
+    return bool(cancel_event and cancel_event.is_set())
 
 def main():
     non_enriched_dict = get_non_enriched_ids_by_product_type()

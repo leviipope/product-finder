@@ -29,3 +29,23 @@ def start_local_enrichment(background_tasks: BackgroundTasks):
 @router.get("/local/status")
 def get_local_enrichment_status():
     return enrichment_service.get_enrichment_status()
+
+@router.post("/local/cancel", status_code=status.HTTP_202_ACCEPTED)
+def cancel_local_enrichment(run_id: str):
+    if enrichment_service.get_enrichment_status()["status"] != "running":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No enrichment job is currently running."
+        )
+
+    if not enrichment_service.cancel_enrichment(run_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unknown enrichment run_id."
+        )
+
+    return {
+        "run_id": run_id,
+        "status": "cancellation_requested",
+    }
+            
