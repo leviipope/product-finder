@@ -103,7 +103,7 @@ def read_enriched_gpu_listings(
     """
     return listing_service.get_enriched_gpu_listings(db, filters)
 
-@router.get("{site}/{listing_id}/price_history", response_model=list[int])
+@router.get("/{site}/{listing_id}/price_history", response_model=list[int])
 def read_price_history(
     site: str,
     listing_id: int,
