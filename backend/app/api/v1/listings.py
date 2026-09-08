@@ -1,15 +1,27 @@
+from typing import Annotated
+
+from app.database import get_db
+from app.schemas.listing import (
+    EnrichedGPUListingBrowseResponse,
+    EnrichedGPUListingFilterParams,
+    EnrichedGPUListingResponse,
+    EnrichedLaptopFilterParams,
+    EnrichedLaptopListingBrowseResponse,
+    EnrichedLaptopListingResponse,
+    ListingFilterParams,
+    ListingResponse,
+)
+from app.services import listing_service
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.schemas.listing import EnrichedGPUListingFilterParams, EnrichedGPUListingBrowseResponse, EnrichedGPUListingResponse, EnrichedLaptopListingBrowseResponse, ListingFilterParams, ListingResponse, EnrichedLaptopFilterParams, EnrichedLaptopListingResponse
-from app.services import listing_service
 
 router = APIRouter(prefix="/listings", tags=["Listings"])
 
+
 @router.get("/non_enriched", response_model=list[ListingResponse])
 def read_listings(
-    filters: ListingFilterParams = Depends(),
-    db: Session = Depends(get_db)
+    filters: Annotated[ListingFilterParams, Depends()],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """
     Fetch paginated non-enriched laptop listings based on user search parameters.
@@ -20,11 +32,12 @@ def read_listings(
     """
     return listing_service.get_listings(db, filters)
 
-@router.get("/laptops/{site}/{listing_id}", response_model=EnrichedLaptopListingResponse)
+
+@router.get(
+    "/laptops/{site}/{listing_id}", response_model=EnrichedLaptopListingResponse
+)
 def read_enriched_laptop_listing(
-    site: str,
-    listing_id: int,
-    db: Session = Depends(get_db)
+    site: str, listing_id: int, db: Annotated[Session, Depends(get_db)]
 ):
     """
     Fetch a single enriched laptop listing by site and listing ID.
@@ -37,10 +50,11 @@ def read_enriched_laptop_listing(
         raise HTTPException(status_code=404, detail="Listing not found")
     return listing
 
+
 @router.get("/laptops", response_model=list[EnrichedLaptopListingBrowseResponse])
 def read_enriched_laptop_listings(
-    filters: EnrichedLaptopFilterParams = Depends(),
-    db: Session = Depends(get_db)
+    filters: Annotated[EnrichedLaptopFilterParams, Depends()],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """
     Fetch paginated enriched laptop listings based on user search parameters.
@@ -68,11 +82,10 @@ def read_enriched_laptop_listings(
     """
     return listing_service.get_enriched_laptop_listings(db, filters)
 
+
 @router.get("/gpus/{site}/{listing_id}", response_model=EnrichedGPUListingResponse)
 def read_enriched_gpu_listing(
-    site: str,
-    listing_id: int,
-    db: Session = Depends(get_db)
+    site: str, listing_id: int, db: Annotated[Session, Depends(get_db)]
 ):
     """
     Fetch a single enriched GPU listing by site and listing ID.
@@ -85,10 +98,11 @@ def read_enriched_gpu_listing(
         raise HTTPException(status_code=404, detail="Listing not found")
     return listing
 
+
 @router.get("/gpus", response_model=list[EnrichedGPUListingBrowseResponse])
 def read_enriched_gpu_listings(
-    filters: EnrichedGPUListingFilterParams = Depends(),
-    db: Session = Depends(get_db)
+    filters: Annotated[EnrichedGPUListingFilterParams, Depends()],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """
     Fetch paginated enriched GPU listings based on user search parameters.
@@ -103,11 +117,10 @@ def read_enriched_gpu_listings(
     """
     return listing_service.get_enriched_gpu_listings(db, filters)
 
-@router.get("{site}/{listing_id}/price_history", response_model=list[int])
+
+@router.get("/{site}/{listing_id}/price_history", response_model=list[int])
 def read_price_history(
-    site: str,
-    listing_id: int,
-    db: Session = Depends(get_db)
+    site: str, listing_id: int, db: Annotated[Session, Depends(get_db)]
 ):
     """
     Fetch the price history of a specific listing.

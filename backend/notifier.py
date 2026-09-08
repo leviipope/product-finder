@@ -1,20 +1,23 @@
 import json
-import sqlite3
-import yagmail
 import os
 import re
-from typing import Callable, Any
-from dotenv import load_dotenv
-from db import get_connection
+import sqlite3
 from collections import defaultdict
+from collections.abc import Callable
+from typing import Any
+
+import yagmail
+from db import get_connection
+from dotenv import load_dotenv
 
 load_dotenv()
 GOOGLE_APP_PASSWORD = os.getenv("GOOGLE_APP_PASSWORD")
 GOOGLE_EMAIL = os.getenv("GOOGLE_EMAIL")
 
+
 def run_notifier(non_enriched_dict):
-    new_laptop_ids = non_enriched_dict['laptop']
-    new_gpu_ids = non_enriched_dict['gpu']
+    new_laptop_ids = non_enriched_dict["laptop"]
+    new_gpu_ids = non_enriched_dict["gpu"]
 
     laptop_matches_by_email = get_laptop_matches_per_email(new_laptop_ids)
     gpu_matches_by_email = get_gpu_matches_per_email(new_gpu_ids)
@@ -27,26 +30,29 @@ def run_notifier(non_enriched_dict):
 
     construct_email(combined_matches_by_email)
 
+
 def construct_email(matches_by_email):
-    '''
+    """
     matches_by_email: dict where key=email, value=list of dicts with keys:
         - listing: joined row from listings and the enriched table (contains all listing data)
         - is_partial_match: bool (only for laptops, not gpus)
         - search_name: str
-    '''
+    """
 
     yag = yagmail.SMTP(GOOGLE_EMAIL, GOOGLE_APP_PASSWORD)
 
     for email, data in matches_by_email.items():
         laptops, gpus = [], []
         for item in data:
-            if 'is_partial_match' in item:
+            if "is_partial_match" in item:
                 laptops.append(item)
             else:
                 gpus.append(item)
 
         subject = f"🔥 {len(data)} New Matches Found!"
-        th_css = "padding: 12px 15px; text-align: left; color: #495057; font-weight: 600;"
+        th_css = (
+            "padding: 12px 15px; text-align: left; color: #495057; font-weight: 600;"
+        )
         td_css = "padding: 12px 15px; vertical-align: middle; text-align: left;"
         header_font = "font-family: 'Segoe UI', Helvetica, Arial, sans-serif;"
 
@@ -54,62 +60,75 @@ def construct_email(matches_by_email):
 
         if laptops:
             html_body += f'<h4 style="{header_font} color: #007bff;">💻 Laptops</h4>'
-            html_body += (f'<table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">'
+            html_body += (
+                f'<table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">'
                 f'<tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">'
-                    f'<th style="{th_css}">Match</th>'
-                    f'<th style="{th_css}">Brand/Model</th>'
-                    f'<th style="{th_css}">Specs</th>'
-                    f'<th style="{th_css}">Price</th>'
-                    f'<th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>'
-                '</tr>')
+                f'<th style="{th_css}">Match</th>'
+                f'<th style="{th_css}">Brand/Model</th>'
+                f'<th style="{th_css}">Specs</th>'
+                f'<th style="{th_css}">Price</th>'
+                f'<th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>'
+                "</tr>"
+            )
             for match in laptops:
-                listing = match['listing']
-                match_type = "⚠️ Partial" if match.get('is_partial_match') else "✅ Match"
+                listing = match["listing"]
+                match_type = (
+                    "⚠️ Partial" if match.get("is_partial_match") else "✅ Match"
+                )
                 specs = f"{listing['cpu_brand']} {listing['cpu_model']} | {listing['ram']}GB RAM"
-                
-                html_body += (f'<tr style="border-bottom: 1px solid #dee2e6;">'
+
+                html_body += (
+                    f'<tr style="border-bottom: 1px solid #dee2e6;">'
                     f'<td style="{td_css}">{match_type}</td>'
                     f'<td style="{td_css}"><b>{listing["enriched_brand"]}</b> {listing["enriched_model"]}</td>'
                     f'<td style="{td_css} font-size: 0.9em; color: #666;">{specs}</td>'
                     f'<td style="{td_css} color: #2e7d32; font-weight: 700;">{listing["price"]:,} {listing["currency"]}</td>'
                     f'<td style="{td_css} text-align: center;">'
-                        f'<a href="{listing["listing_url"]}" target="_blank" style="background-color: #007bff; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>'
-                    '</td>'
-                '</tr>')
-            html_body += '<br></table>'
+                    f'<a href="{listing["listing_url"]}" target="_blank" style="background-color: #007bff; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>'
+                    "</td>"
+                    "</tr>"
+                )
+            html_body += "<br></table>"
 
         if gpus:
-            html_body += f'<h4 style="{header_font} color: #6f42c1;">🎮 Graphics Cards</h4>'
-            html_body += (f'<table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">'
+            html_body += (
+                f'<h4 style="{header_font} color: #6f42c1;">🎮 Graphics Cards</h4>'
+            )
+            html_body += (
+                f'<table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; {header_font} background-color: #fff; margin-bottom: 30px;">'
                 f'<tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">'
-                    f'<th style="{th_css}">Search</th>'
-                    f'<th style="{th_css}">Model</th>'
-                    f'<th style="{th_css}">Price</th>'
-                    f'<th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>'
-                '</tr>')
+                f'<th style="{th_css}">Search</th>'
+                f'<th style="{th_css}">Model</th>'
+                f'<th style="{th_css}">Price</th>'
+                f'<th style="padding: 12px 15px; text-align: center; color: #495057; font-weight: 600;">Action</th>'
+                "</tr>"
+            )
             for match in gpus:
-                listing = match['listing']
-                html_body += (f'<tr style="border-bottom: 1px solid #dee2e6;">'
+                listing = match["listing"]
+                html_body += (
+                    f'<tr style="border-bottom: 1px solid #dee2e6;">'
                     f'<td style="{td_css} color: #555;">{match["search_name"]}</td>'
                     f'<td style="{td_css}"><b>{listing["enriched_brand"]}</b> {listing["enriched_model"]}</td>'
                     f'<td style="{td_css} color: #2e7d32; font-weight: 700;">{listing["price"]:,} {listing["currency"]}</td>'
                     f'<td style="{td_css} text-align: center;">'
-                        f'<a href="{listing["listing_url"]}" target="_blank" style="background-color: #6f42c1; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>'
-                    '</td>'
-                '</tr>')
-            html_body += '</table>'
+                    f'<a href="{listing["listing_url"]}" target="_blank" style="background-color: #6f42c1; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px;">View</a>'
+                    "</td>"
+                    "</tr>"
+                )
+            html_body += "</table>"
 
-        html_body += '<p style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #555;">Happy hunting!</p>'
+        html_body += "<p style=\"font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #555;\">Happy hunting!</p>"
 
         yag.send(to=email, subject=subject, contents=html_body)
 
     print(f"Sent notifications to {len(matches_by_email)} users.")
 
+
 def get_laptop_matches_per_email(new_laptop_ids):
     with get_connection() as conn:
         c = conn.cursor()
 
-        placeholders = ', '.join(['?'] * len(new_laptop_ids))
+        placeholders = ", ".join(["?"] * len(new_laptop_ids))
         query = f"""
             SELECT 
                 l.site,
@@ -150,23 +169,28 @@ def get_laptop_matches_per_email(new_laptop_ids):
         laptop_matches_by_email = defaultdict(list)
         for listing in new_listings:
             for search in searches:
-                user_filter = json.loads(search['filters'])
-                is_match, is_partial_match = match_listing_to_filters_laptops(listing, user_filter)
+                user_filter = json.loads(search["filters"])
+                is_match, is_partial_match = match_listing_to_filters_laptops(
+                    listing, user_filter
+                )
 
                 if is_match:
-                    laptop_matches_by_email[search['email']].append({
-                        "listing": listing,
-                        "is_partial_match": is_partial_match,
-                        "search_name": search['search_name']
-                    })
+                    laptop_matches_by_email[search["email"]].append(
+                        {
+                            "listing": listing,
+                            "is_partial_match": is_partial_match,
+                            "search_name": search["search_name"],
+                        }
+                    )
 
         return laptop_matches_by_email
+
 
 def get_gpu_matches_per_email(new_gpu_ids):
     with get_connection() as conn:
         c = conn.cursor()
 
-        placeholders = ', '.join(['?'] * len(new_gpu_ids))
+        placeholders = ", ".join(["?"] * len(new_gpu_ids))
         query = f"""
             SELECT
                 l.site,
@@ -197,15 +221,14 @@ def get_gpu_matches_per_email(new_gpu_ids):
         gpu_matches_by_email = defaultdict(list)
         for listing in new_listings:
             for search in searches:
-                user_filter = json.loads(search['filters'])
+                user_filter = json.loads(search["filters"])
                 is_match = match_listing_to_filters_gpus(listing, user_filter)
 
                 if is_match:
-                    gpu_matches_by_email[search['email']].append({
-                        "listing": listing,
-                        "search_name": search['search_name']
-                    })
-        
+                    gpu_matches_by_email[search["email"]].append(
+                        {"listing": listing, "search_name": search["search_name"]}
+                    )
+
         return gpu_matches_by_email
 
 
@@ -217,48 +240,59 @@ def match_listing_to_filters_laptops(listing, user_filter):
 
     partial_match = False
 
-    if not (user_filter['min_price'] <= listing['price'] <= user_filter['max_price']):
+    if not (user_filter["min_price"] <= listing["price"] <= user_filter["max_price"]):
         return False, False
 
-    if user_filter['enriched_brand'] != "Any" and listing['enriched_brand'].lower() != user_filter['enriched_brand'].lower():
+    if (
+        user_filter["enriched_brand"] != "Any"
+        and listing["enriched_brand"].lower() != user_filter["enriched_brand"].lower()
+    ):
         return False, False
 
-    if listing['screen_size'] is None:
+    if listing["screen_size"] is None:
         partial_match = True
-    elif not (user_filter['min_screen_size'] <= float(listing['screen_size']) <= user_filter['max_screen_size']):
+    elif not (
+        user_filter["min_screen_size"]
+        <= float(listing["screen_size"])
+        <= user_filter["max_screen_size"]
+    ):
         return False, partial_match
-    
-    if user_filter['panel_type'] != "Any":
-        if listing['panel_type'] is None:
+
+    if user_filter["panel_type"] != "Any":
+        if listing["panel_type"] is None:
             partial_match = True
-        elif user_filter['panel_type'].lower().strip() != listing['panel_type'].lower().strip():
+        elif (
+            user_filter["panel_type"].lower().strip()
+            != listing["panel_type"].lower().strip()
+        ):
             return False, partial_match
-        
-    if listing['refresh_rate'] is None:
+
+    if listing["refresh_rate"] is None:
         partial_match = True
-    elif not (int(listing['refresh_rate']) >= user_filter['refresh_rate']):
+    elif not (int(listing["refresh_rate"]) >= user_filter["refresh_rate"]):
         return False, partial_match
-    
-    user_gpu = user_filter['gpu_model'].strip()
-    listing_gpu = (listing['gpu_model'] or "").lower().strip()
-    if user_gpu == 'Any':
+
+    user_gpu = user_filter["gpu_model"].strip()
+    listing_gpu = (listing["gpu_model"] or "").lower().strip()
+    if user_gpu == "Any":
         pass
     elif not listing_gpu:
         partial_match = True
     elif user_gpu not in listing_gpu:
         return False, partial_match
-        
-    if listing['ram'] is None:
+
+    if listing["ram"] is None:
         partial_match = True
-    elif not (int(listing['ram']) >= user_filter['ram']):
+    elif not (int(listing["ram"]) >= user_filter["ram"]):
         return False, partial_match
-    
-    if listing['storage_size'] is None:
+
+    if listing["storage_size"] is None:
         partial_match = True
-    elif not (int(listing['storage_size']) >= user_filter['storage_size']):
+    elif not (int(listing["storage_size"]) >= user_filter["storage_size"]):
         return False, partial_match
 
     return True, partial_match
+
 
 def match_listing_to_filters_gpus(listing, user_filter):
     """
@@ -268,9 +302,10 @@ def match_listing_to_filters_gpus(listing, user_filter):
 
     def is_gpu_model_match(user_model, listing_model):
         def check_ti(s):
-            return bool(re.search(r'(\d+ti|\bti\b|superti)', s.lower()))
+            return bool(re.search(r"(\d+ti|\bti\b|superti)", s.lower()))
+
         def check_super(s):
-            return bool(re.search(r'(\d+super|\bsuper\b|tisuper)', s.lower()))
+            return bool(re.search(r"(\d+super|\bsuper\b|tisuper)", s.lower()))
 
         user_searching_for_ti = check_ti(user_model)
         listing_is_ti = check_ti(listing_model)
@@ -279,19 +314,22 @@ def match_listing_to_filters_gpus(listing, user_filter):
 
         if user_searching_for_ti != listing_is_ti:
             return False
-        
+
         if user_searching_for_super != listing_is_super:
             return False
 
-        user_model = user_model.replace(' ', '').strip().lower()
-        listing_model = listing_model.replace(' ', '').strip().lower()
+        user_model = user_model.replace(" ", "").strip().lower()
+        listing_model = listing_model.replace(" ", "").strip().lower()
         return user_model in listing_model
 
-    if user_filter['enriched_brand'] != "Any" and listing['enriched_brand'].lower() != user_filter['enriched_brand'].lower():
+    if (
+        user_filter["enriched_brand"] != "Any"
+        and listing["enriched_brand"].lower() != user_filter["enriched_brand"].lower()
+    ):
         return False
 
-    user_model = user_filter['enriched_model']
-    listing_model = (listing['enriched_model'] or "")
+    user_model = user_filter["enriched_model"]
+    listing_model = listing["enriched_model"] or ""
 
     if not listing_model:
         return False
@@ -305,10 +343,13 @@ def match_listing_to_filters_gpus(listing, user_filter):
         if not atleast_one_match_found:
             return False
     else:
-        if user_filter['max_price'] < listing['price'] or (user_model != "Any" and not is_gpu_model_match(user_model, listing_model)):
+        if user_filter["max_price"] < listing["price"] or (
+            user_model != "Any" and not is_gpu_model_match(user_model, listing_model)
+        ):
             return False
-        
+
     return True
+
 
 def add_search():
     with get_connection() as conn:
@@ -321,7 +362,9 @@ def add_search():
                 break
 
         while True:
-            category = input("Please specify a category (laptops/gpus): ").strip().lower()
+            category = (
+                input("Please specify a category (laptops/gpus): ").strip().lower()
+            )
             if category == "laptops":
                 filter_results = get_laptop_filters()
                 break
@@ -329,16 +372,19 @@ def add_search():
                 filter_results = get_gpu_filters()
                 break
 
-        query = 'INSERT INTO searches (email, search_name, category, filters, is_active) VALUES (?, ?, ?, ?, ?)'
+        query = "INSERT INTO searches (email, search_name, category, filters, is_active) VALUES (?, ?, ?, ?, ?)"
         values = (email, search_name, category, filter_results, 1)
 
         try:
             c.execute(query, values)
             row_id = c.lastrowid
-            print(f"\nSearch {search_name} added for {email}! Your Search ID is: {row_id}")
-            print(f"Keep this ID if you wish to delete this search later.")
-        except Exception as e:
+            print(
+                f"\nSearch {search_name} added for {email}! Your Search ID is: {row_id}"
+            )
+            print("Keep this ID if you wish to delete this search later.")
+        except sqlite3.Error as e:
             print(f"Error saving to database: {e}")
+
 
 def remove_search():
     with get_connection() as conn:
@@ -351,7 +397,7 @@ def remove_search():
                 break
             print("Please enter a valid numeric ID")
 
-        c.execute('SELECT email, category FROM searches WHERE search_id = ?', (row_id,))
+        c.execute("SELECT email, category FROM searches WHERE search_id = ?", (row_id,))
         row = c.fetchone()
 
         if not row:
@@ -360,56 +406,80 @@ def remove_search():
         email_in_db, category = row
 
         print(f"Found search in category: {category}")
-        if input("Please verify yourself by providing your email: ").strip().lower() == email_in_db:
+        if (
+            input("Please verify yourself by providing your email: ").strip().lower()
+            == email_in_db
+        ):
             print(f"Deleting row {row_id}...")
             try:
-                c.execute('DELETE FROM searches WHERE search_id = ?', (row_id,))
+                c.execute("DELETE FROM searches WHERE search_id = ?", (row_id,))
                 conn.commit()
                 print("Success!")
-            except sqlite3.OperationalError as e:
+            except sqlite3.Error as e:
                 print(f"Database error: {e}")
-            except Exception as e:
-                print(f"An unexpected error occurred: {e}")
         else:
-            print("Email verification failed. Deletion aborted.") 
+            print("Email verification failed. Deletion aborted.")
+
 
 def get_laptop_filters():
     while True:
-        data = {"enriched_brand": "Any", "min_screen_size": 0.0, "max_screen_size": 99.0,
-                "panel_type": "Any", "refresh_rate": 0, "gpu_model": "Any", "ram": 0, "storage_size": 0,
-                "min_price": 0, "max_price": 9_999_999}
+        data = {
+            "enriched_brand": "Any",
+            "min_screen_size": 0.0,
+            "max_screen_size": 99.0,
+            "panel_type": "Any",
+            "refresh_rate": 0,
+            "gpu_model": "Any",
+            "ram": 0,
+            "storage_size": 0,
+            "min_price": 0,
+            "max_price": 9_999_999,
+        }
 
         only_price = input("Do you wish to only add a price filter (y/n)? ").lower()
         if only_price != "y":
             data["enriched_brand"] = get_input("Brand: ", str, "Any")
-            data["min_screen_size"] = get_input("Minimum screen size (float): ", float, 0.0)
-            data["max_screen_size"] = get_input("Maximum screen size (float): ", float, 99.0)
+            data["min_screen_size"] = get_input(
+                "Minimum screen size (float): ", float, 0.0
+            )
+            data["max_screen_size"] = get_input(
+                "Maximum screen size (float): ", float, 99.0
+            )
             data["panel_type"] = get_input("Panel type: ", str, "Any")
             data["refresh_rate"] = get_input("Minimum refresh rate (int): ", int, 0)
             data["gpu_model"] = get_input("GPU model (ex.: 3080, 4060) : ", str, "Any")
             data["ram"] = get_input("Minimum ram (GB): ", int, 0)
             data["storage_size"] = get_input("Minimum storage (GB): ", int, 0)
-                
+
         data["min_price"] = get_input("Minimum price (int): ", int, 0)
         data["max_price"] = get_input("Maximum price (int): ", int, 9_999_999)
 
         print("\n--- Review Your Filter ---")
         for key, value in data.items():
             print(f"{key.replace('_', ' ').title()}: {value}")
-        
-        if input("\nDoes this look correct? (y/n): ").lower() in ('y', 'yes'):
+
+        if input("\nDoes this look correct? (y/n): ").lower() in ("y", "yes"):
             return json.dumps(data, indent=2)
-        
+
+
 def get_gpu_filters():
     while True:
-        data: dict[str, Any] = {"enriched_brand": "Any", "enriched_model": "Any", "max_price": 9_999_999}
+        data: dict[str, Any] = {
+            "enriched_brand": "Any",
+            "enriched_model": "Any",
+            "max_price": 9_999_999,
+        }
 
-        data['enriched_brand'] = get_input("Brand ('NVIDIA', 'AMD' or 'Intel'): ", str, "Any")
-        
+        data["enriched_brand"] = get_input(
+            "Brand ('NVIDIA', 'AMD' or 'Intel'): ", str, "Any"
+        )
+
         print("Do you wish to search for one model or multiple models?")
-        print("Note: Searching for multiple models will not allow you to set a maximum price.")
+        print(
+            "Note: Searching for multiple models will not allow you to set a maximum price."
+        )
         only_one_model = input("Answer (one/more): ").lower()
-        if only_one_model == 'more':
+        if only_one_model == "more":
             data["enriched_model"] = []
             print("Please type a model (ex. 3080/3070ti) and hit enter.")
             print("If you are finished, type 'done' or ''.")
@@ -421,7 +491,7 @@ def get_gpu_filters():
                 else:
                     break
 
-        elif only_one_model == 'one':
+        elif only_one_model == "one":
             data["enriched_model"] = get_input("Model: ", str, "Any")
             data["max_price"] = get_input("Maximum price (int): ", int, 9_999_999)
 
@@ -429,9 +499,10 @@ def get_gpu_filters():
         for key, value in data.items():
             print(f"{key.replace('_', ' ').title()}: {value}")
 
-        if input("\nDoes this look correct? (y/n): ").lower() in ('y', 'yes'):
+        if input("\nDoes this look correct? (y/n): ").lower() in ("y", "yes"):
             return json.dumps(data, indent=2)
-        
+
+
 def toggle_active_serch():
     email = get_email()
     search_id = int(input("Please provide the id of the search you'd like to toggle: "))
@@ -439,27 +510,33 @@ def toggle_active_serch():
     with get_connection() as conn:
         c = conn.cursor()
 
-        c.execute('SELECT * FROM searches WHERE search_id = ?', (search_id,))
+        c.execute("SELECT * FROM searches WHERE search_id = ?", (search_id,))
         search = c.fetchone()
 
         if not search:
             print("Error.")
             return
-        
-        search_name = search['search_name']
-        search_email = search['email']
-        is_active = search['is_active']
+
+        search_name = search["search_name"]
+        search_email = search["email"]
+        is_active = search["is_active"]
 
         if search_email != email:
             print("Error.")
             return
-        
+
         new_status = 0 if is_active else 1
-        c.execute('UPDATE searches SET is_active = ? WHERE search_id = ?', (new_status, search_id))
+        c.execute(
+            "UPDATE searches SET is_active = ? WHERE search_id = ?",
+            (new_status, search_id),
+        )
         status_str = "activated" if new_status else "deactivated"
         print(f"Search '{search_name}' (ID: {search_id}) has been {status_str}.")
 
-def get_input(prompt: str, cast_type: Callable[[Any], Any] = str, default: Any = None) -> Any:
+
+def get_input(
+    prompt: str, cast_type: Callable[[Any], Any] = str, default: Any = None
+) -> Any:
     user_val = input(prompt).strip()
     if not user_val:
         return default
@@ -468,23 +545,25 @@ def get_input(prompt: str, cast_type: Callable[[Any], Any] = str, default: Any =
     except (ValueError, TypeError):
         print(f"Invalid input. Using default: {default}")
         return default
-    
+
+
 def get_email():
     while True:
         email = input("Please provide your email: ").strip().lower()
         if email == "admin":
             return GOOGLE_EMAIL
-        if not email or '@' not in email or '.' not in email:
+        if not email or "@" not in email or "." not in email:
             print("Please check if you provided the correct email.")
             continue
 
         confirm_email = input(f"Is '{email}' correct? (y/n): ").strip().lower()
-        if confirm_email not in ('y', 'yes'):
+        if confirm_email not in ("y", "yes"):
             continue
 
         return email
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     action = input("Enter action (add/remove/toggle): ")
 
     if action == "add":
@@ -493,7 +572,12 @@ if __name__=="__main__":
         remove_search()
     elif action == "toggle":
         toggle_active_serch()
-    elif action == 'dev':
-        run_notifier({'laptop': [7224997], 'gpu': [7361551, 7315451, 7354973, 7351280, 7355918, 7272662]})
+    elif action == "dev":
+        run_notifier(
+            {
+                "laptop": [7224997],
+                "gpu": [7361551, 7315451, 7354973, 7351280, 7355918, 7272662],
+            }
+        )
     else:
         print("Please type either 'add', 'remove' or 'toggle'")

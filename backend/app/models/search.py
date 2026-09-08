@@ -1,7 +1,9 @@
 from typing import Any
-from sqlalchemy import String, Integer, Boolean, JSON
-from sqlalchemy.orm import Mapped, mapped_column
+
 from app.database import Base
+from sqlalchemy import JSON, Boolean, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
 
 class Search(Base):
     __tablename__ = "searches"

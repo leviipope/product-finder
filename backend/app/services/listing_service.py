@@ -1,7 +1,12 @@
+from app.models.listing import EnrichedGPUListing, EnrichedLaptopListing, Listing
+from app.schemas.listing import (
+    EnrichedGPUListingFilterParams,
+    EnrichedLaptopFilterParams,
+    ListingFilterParams,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.models.listing import EnrichedGPUListing, Listing, EnrichedLaptopListing
-from app.schemas.listing import EnrichedGPUListingFilterParams, ListingFilterParams, EnrichedLaptopFilterParams
+
 
 def get_listings(db: Session, params: ListingFilterParams) -> list[Listing]:
     stmt = select(Listing)
@@ -19,15 +24,21 @@ def get_listings(db: Session, params: ListingFilterParams) -> list[Listing]:
 
     return list(db.scalars(stmt).all())
 
-def get_enriched_laptop_listing(db: Session, site: str, listing_id: int) -> EnrichedLaptopListing | None:
+
+def get_enriched_laptop_listing(
+    db: Session, site: str, listing_id: int
+) -> EnrichedLaptopListing | None:
     stmt = select(EnrichedLaptopListing).where(
         EnrichedLaptopListing.site == site,
-        EnrichedLaptopListing.listing_id == listing_id
+        EnrichedLaptopListing.listing_id == listing_id,
     )
 
     return db.scalars(stmt).first()
 
-def get_enriched_laptop_listings(db: Session, params: EnrichedLaptopFilterParams) -> list[EnrichedLaptopListing]:
+
+def get_enriched_laptop_listings(
+    db: Session, params: EnrichedLaptopFilterParams
+) -> list[EnrichedLaptopListing]:
     stmt = select(EnrichedLaptopListing)
 
     if params.site:
@@ -59,23 +70,35 @@ def get_enriched_laptop_listings(db: Session, params: EnrichedLaptopFilterParams
     if params.max_ram_gb:
         stmt = stmt.where(EnrichedLaptopListing.ram_gb <= params.max_ram_gb)
     if params.min_storage_size_gb:
-        stmt = stmt.where(EnrichedLaptopListing.storage_size_gb >= params.min_storage_size_gb)
+        stmt = stmt.where(
+            EnrichedLaptopListing.storage_size_gb >= params.min_storage_size_gb
+        )
     if params.max_storage_size_gb:
-        stmt = stmt.where(EnrichedLaptopListing.storage_size_gb <= params.max_storage_size_gb)
+        stmt = stmt.where(
+            EnrichedLaptopListing.storage_size_gb <= params.max_storage_size_gb
+        )
     if params.storage_type:
         stmt = stmt.where(EnrichedLaptopListing.storage_type == params.storage_type)
     if params.resolution:
         stmt = stmt.where(EnrichedLaptopListing.resolution == params.resolution)
     if params.min_screen_size_inch:
-        stmt = stmt.where(EnrichedLaptopListing.screen_size_inch >= params.min_screen_size_inch)
+        stmt = stmt.where(
+            EnrichedLaptopListing.screen_size_inch >= params.min_screen_size_inch
+        )
     if params.max_screen_size_inch:
-        stmt = stmt.where(EnrichedLaptopListing.screen_size_inch <= params.max_screen_size_inch)
+        stmt = stmt.where(
+            EnrichedLaptopListing.screen_size_inch <= params.max_screen_size_inch
+        )
     if params.panel_type:
         stmt = stmt.where(EnrichedLaptopListing.panel_type == params.panel_type)
     if params.min_refresh_rate_hz:
-        stmt = stmt.where(EnrichedLaptopListing.refresh_rate_hz >= params.min_refresh_rate_hz)
+        stmt = stmt.where(
+            EnrichedLaptopListing.refresh_rate_hz >= params.min_refresh_rate_hz
+        )
     if params.max_refresh_rate_hz:
-        stmt = stmt.where(EnrichedLaptopListing.refresh_rate_hz <= params.max_refresh_rate_hz)
+        stmt = stmt.where(
+            EnrichedLaptopListing.refresh_rate_hz <= params.max_refresh_rate_hz
+        )
     if params.location:
         stmt = stmt.where(EnrichedLaptopListing.location.ilike(f"%{params.location}%"))
 
@@ -83,15 +106,20 @@ def get_enriched_laptop_listings(db: Session, params: EnrichedLaptopFilterParams
 
     return list(db.scalars(stmt).all())
 
-def get_enriched_gpu_listing(db: Session, site: str, listing_id: int) -> EnrichedGPUListing | None:
+
+def get_enriched_gpu_listing(
+    db: Session, site: str, listing_id: int
+) -> EnrichedGPUListing | None:
     stmt = select(EnrichedGPUListing).where(
-        EnrichedGPUListing.site == site,
-        EnrichedGPUListing.listing_id == listing_id
+        EnrichedGPUListing.site == site, EnrichedGPUListing.listing_id == listing_id
     )
 
     return db.scalars(stmt).first()
 
-def get_enriched_gpu_listings(db: Session, params: EnrichedGPUListingFilterParams) -> list[EnrichedGPUListing]:
+
+def get_enriched_gpu_listings(
+    db: Session, params: EnrichedGPUListingFilterParams
+) -> list[EnrichedGPUListing]:
     stmt = select(EnrichedGPUListing)
 
     if params.site:
@@ -115,11 +143,9 @@ def get_enriched_gpu_listings(db: Session, params: EnrichedGPUListingFilterParam
 
     return list(db.scalars(stmt).all())
 
+
 def get_price_history(db: Session, site: str, listing_id: int) -> list[int] | None:
-    stmt = select(Listing).where(
-        Listing.site == site,
-        Listing.id == listing_id
-    )
+    stmt = select(Listing).where(Listing.site == site, Listing.id == listing_id)
 
     listing = db.scalars(stmt).first()
 

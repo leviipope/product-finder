@@ -62,8 +62,11 @@ flowchart LR
     subgraph EnrichmentGroup["Local enrichment"]
         direction TB
         StartEnrichment["POST /enrichment/local"]
+        EnrichmentStatus["GET /enrichment/local/status"]
         Ollama["Ollama models"]
         EnrichedTables[("Update enriched tables")]
+        Frontend --> StartEnrichment
+        Frontend --> EnrichmentStatus
         StartEnrichment --> Ollama --> EnrichedTables
     end
 
@@ -77,7 +80,7 @@ flowchart LR
     classDef data fill:#f3e8ef,stroke:#8f4567,color:#482238;
     classDef process fill:#eef5e8,stroke:#4f772d,color:#243b16;
     class Frontend client;
-    class API,AddSearch,ViewSearches,ManageSearch,LaptopAPI,GPUAPI,DetailAPI,OriginalAPI,PriceAPI,StartEnrichment api;
+    class API,AddSearch,ViewSearches,ManageSearch,LaptopAPI,GPUAPI,DetailAPI,OriginalAPI,PriceAPI,StartEnrichment,EnrichmentStatus api;
     class SearchDB,LaptopData,GPUData,ListingData,EnrichedTables data;
     class Notifier,Ollama process;
 ```
@@ -158,14 +161,55 @@ The listing detail endpoint should return `404 Not Found` for a missing listing.
 
 | Method | Endpoint | Purpose | Current implementation |
 | --- | --- | --- | --- |
-| `POST` | `/api/v1/enrichment/local` | Start local LLM enrichment for all currently unenriched supported listings. | Calls `get_non_enriched_ids_by_product_type()` and runs `local_enrichment()`, which writes to `enriched_specs_laptops` and `enriched_gpus`. |
+| `POST` | `/api/v1/enrichment/local` | Start local LLM enrichment for all currently unenriched supported listings. | Checks that Ollama is reachable, starts the job with FastAPI `BackgroundTasks`, and returns an estimated duration. |
+| `GET` | `/api/v1/enrichment/local/status` | Check the current enrichment job. | Returns the in-memory job status, including `idle`, `running`, `completed`, or `failed`, plus the estimate. |
+| `POST` | `/api/v1/enrichment/local/cancel` | Request cancellation of the active enrichment job. | Accepts the active `run_id`, returns enriched counts by product type, and cooperatively stops processing before the next listing or retry. |
 
-The endpoint should return `202 Accepted` with a run identifier because enrichment invokes Ollama and may take a long time. The first version can start one local run and reject a second simultaneous request with `409 Conflict`.
+The start endpoint returns `202 Accepted` with a run identifier because enrichment invokes Ollama and may take a long time. It also returns `estimated_runtime`, calculated as `(remaining laptops * 6) + (remaining GPUs * 4)`. The same estimate should be included in status responses. It returns `503 Service Unavailable` when Ollama cannot be reached, and `409 Conflict` when another enrichment job is already running. A lightweight in-memory job state is sufficient for this local quality-of-life feature; no external queue or worker system is needed.
+
+The background job should call the existing orchestration in `enrichment.py`:
+
+1. Call `get_non_enriched_ids_by_product_type()`.
+2. Run `local_enrichment()` for the returned IDs.
+3. Run the notifier if notification processing remains part of the manual workflow.
+
+Cancellation should be cooperative: the cancel endpoint returns `202 Accepted` with an `enriched_counts` snapshot for laptops and GPUs, and the job checks its cancellation flag between listings and retries. Counts increase only after a listing is successfully written to its enriched table. A synchronous Ollama request already in progress is allowed to finish; completed listings remain saved, and the notifier is skipped after cancellation. The endpoint should return `404 Not Found` for an unknown `run_id` and `409 Conflict` when no job is running.
+
+Manual execution of `enrichment.py` remains a fallback. The API is intended for a single local backend process, and its in-memory status is reset when that process restarts. Forcefully terminating the background task is not supported.
 
 ```json
 {
     "run_id": "enrichment-20260903-001",
-    "status": "started"
+    "status": "started",
+    "estimated_runtime": 1240
+}
+```
+
+Example status response:
+
+```json
+{
+    "run_id": "enrichment-20260903-001",
+    "status": "running",
+    "estimated_runtime": 1240,
+    "enriched_counts": {
+        "laptop": 12,
+        "gpu": 4
+    },
+    "error": null
+}
+```
+
+Example cancellation response:
+
+```json
+{
+    "run_id": "enrichment-20260903-001",
+    "status": "cancellation_requested",
+    "enriched_counts": {
+        "laptop": 12,
+        "gpu": 4
+    }
 }
 ```
 
@@ -177,5 +221,8 @@ The endpoint should return `202 Accepted` with a run identifier because enrichme
 - Add `archived_at IS NULL` to the default listing query; archive state is managed by the scraper.
 - Add `listing_url` to the public listing response so the frontend can link to the source listing.
 - Keep enriched and original listing data as separate response views, rather than overwriting the scraped row.
-- Move the callable enrichment orchestration behind an application service so the API does not import the script entry point directly.
+- Move the callable enrichment orchestration behind an application service so the API does not import the script entry point directly. The current implementation uses FastAPI `BackgroundTasks` so the start request returns immediately.
+- Add a small in-memory enrichment job state and an Ollama availability check before starting. Do not add Celery, Redis, or another external queue for the first version.
+- Add an in-memory cancellation event to the enrichment job state and expose `POST /api/v1/enrichment/local/cancel` with `run_id` validation.
+- Track successfully enriched listings by product type and return a count snapshot from the cancel endpoint.
 - Add ownership or authorization checks before exposing search deletion, since the current table has no user identifier beyond `email`.

@@ -1,5 +1,7 @@
 from datetime import datetime
+
 from pydantic import BaseModel
+
 
 class ListingFilterParams(BaseModel):
     city: str | None = None
@@ -8,6 +10,7 @@ class ListingFilterParams(BaseModel):
     max_price: int | None = None
     skip: int = 0
     limit: int = 20
+
 
 class ListingResponse(BaseModel):
     site: str
@@ -27,6 +30,7 @@ class ListingResponse(BaseModel):
     description: str
     listed_at: datetime | None
     scraped_at: datetime
+
 
 class EnrichedLaptopFilterParams(BaseModel):
     site: str | None = None
@@ -56,11 +60,13 @@ class EnrichedLaptopFilterParams(BaseModel):
     skip: int = 0
     limit: int = 20
 
+
 class EnrichedLaptopListingResponse(BaseModel):
     """
     Response model for enriched laptop listings with all fields.
     This model is used for detailed listing views on the frontend.
     """
+
     site: str
     listing_id: int
     brand: str | None
@@ -94,11 +100,13 @@ class EnrichedLaptopListingResponse(BaseModel):
     listed_at: datetime | None
     scraped_at: datetime
 
+
 class EnrichedLaptopListingBrowseResponse(BaseModel):
     """
     Response model for browsing enriched laptop listings with essential fields.
     These fields will be in the individual listing cards on the frontend.
     """
+
     site: str
     listing_id: int
     brand: str | None
@@ -116,6 +124,7 @@ class EnrichedLaptopListingBrowseResponse(BaseModel):
     resolution: str | None
     refresh_rate_hz: int | None
 
+
 class EnrichedGPUListingFilterParams(BaseModel):
     site: str | None = None
     brand: str | None = None
@@ -127,6 +136,7 @@ class EnrichedGPUListingFilterParams(BaseModel):
     iced_status: bool | None = None
     skip: int = 0
     limit: int = 20
+
 
 class EnrichedGPUListingResponse(BaseModel):
     site: str
@@ -151,6 +161,7 @@ class EnrichedGPUListingResponse(BaseModel):
     location: str
     listed_at: datetime | None
     scraped_at: datetime
+
 
 class EnrichedGPUListingBrowseResponse(BaseModel):
     site: str
