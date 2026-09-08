@@ -1,9 +1,10 @@
 from db import get_connection
 
+
 def main():
     with get_connection() as conn:
         cursor = conn.cursor()
-        
+
         # 1. Fetch new items added today
         cursor.execute("""
             SELECT product_type, COUNT(*) 
@@ -14,7 +15,7 @@ def main():
             GROUP BY product_type
         """)
         new_stats = {row[0]: row[1] for row in cursor.fetchall()}
-        
+
         # 2. Fetch verified items archived today
         cursor.execute("""
             SELECT product_type, COUNT(*) 
@@ -42,6 +43,7 @@ def main():
     print(f"   Laptops (Notebook): {archived_stats.get('Notebook', 0)}")
     print(f"   GPUs (Hardver):     {archived_stats.get('Hardver', 0)}")
     print(f"{CYAN}{BOLD}=" * 45 + f"{RESET}")
+
 
 if __name__ == "__main__":
     main()

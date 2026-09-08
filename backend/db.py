@@ -1,5 +1,5 @@
-import sqlite3
 import os
+import sqlite3
 from pathlib import Path
 
 base_dir = Path(__file__).parent.parent
@@ -7,13 +7,15 @@ db_path = base_dir / "data" / "database.db"
 db_path = os.path.abspath(db_path)
 DATABASE_PATH = db_path
 
+
 def get_active_listing_ids():
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("SELECT id, iced_status FROM listings WHERE archived_at IS NULL")
         results = c.fetchall()
 
-        return {str(row['id']): bool(row['iced_status']) for row in results}
+        return {str(row["id"]): bool(row["iced_status"]) for row in results}
+
 
 def get_non_enriched_ids_by_product_type() -> dict[str, list[int]]:
     laptop_ids = get_non_enriched_laptop_ids()
@@ -21,10 +23,11 @@ def get_non_enriched_ids_by_product_type() -> dict[str, list[int]]:
 
     return laptop_ids | gpu_ids
 
+
 def get_non_enriched_laptop_ids() -> dict[str, list[int]]:
     with get_connection() as conn:
         c = conn.cursor()
-        
+
         c.execute("""
             SELECT id FROM listings 
             WHERE product_type = 'Notebook' 
@@ -32,14 +35,15 @@ def get_non_enriched_laptop_ids() -> dict[str, list[int]]:
         """)
         results = c.fetchall()
 
-        ids = [row['id'] for row in results]
+        ids = [row["id"] for row in results]
 
         return {"laptop": ids}
-    
+
+
 def get_non_enriched_gpu_ids() -> dict[str, list[int]]:
     with get_connection() as conn:
         c = conn.cursor()
-        
+
         c.execute("""
             SELECT id FROM listings 
             WHERE json_extract(category, '$[2]') = 'Videokártya'
@@ -47,9 +51,10 @@ def get_non_enriched_gpu_ids() -> dict[str, list[int]]:
         """)
         results = c.fetchall()
 
-        ids = [row['id'] for row in results]
+        ids = [row["id"] for row in results]
 
         return {"gpu": ids}
+
 
 def get_latest_price(id):
     with get_connection() as conn:
@@ -62,18 +67,20 @@ def get_latest_price(id):
 
         return int(row[0])
 
+
 def get_latest_prices(ids):
     if not ids:
         return {}
 
     with get_connection() as conn:
         c = conn.cursor()
-        placeholders = ', '.join('?' for _ in ids)
+        placeholders = ", ".join("?" for _ in ids)
         query = f"SELECT id, price FROM listings WHERE id IN ({placeholders})"
         c.execute(query, ids)
         results = c.fetchall()
 
-        return {str(row['id']): int(row['price']) for row in results}
+        return {str(row["id"]): int(row["price"]) for row in results}
+
 
 def get_iced_status(id):
     with get_connection() as conn:
@@ -86,10 +93,14 @@ def get_iced_status(id):
 
         return bool(row[0])
 
+
 def get_prompt(id, product_type):
     with get_connection() as conn:
         c = conn.cursor()
-        c.execute("SELECT title, category, site, description FROM listings WHERE id = ?", (id,))
+        c.execute(
+            "SELECT title, category, site, description FROM listings WHERE id = ?",
+            (id,),
+        )
 
         row = c.fetchone()
         title, category, site, description = row
@@ -108,6 +119,7 @@ Description = {description}
 
     return prompt, site
 
+
 def get_all_listings():
     """Prints all listings in the table, but only prints attributes that have value"""
     with get_connection() as conn:
@@ -117,7 +129,6 @@ def get_all_listings():
 
         if not results:
             print("Table is empty")
-            return None
 
         number_of_listings = 0
 
@@ -126,9 +137,9 @@ def get_all_listings():
             filtered = {k: v for k, v in row_dict.items() if v is not None}
             number_of_listings += 1
             print(filtered)
-            
-        print(f"\n{'-'*33}\nNumber of listings in total: {number_of_listings}")
-        
+
+        print(f"\n{'-' * 33}\nNumber of listings in total: {number_of_listings}")
+
 
 def execute_sql(sql):
     with get_connection() as conn:
@@ -137,6 +148,7 @@ def execute_sql(sql):
             c.execute(sql)
         else:
             print("SQL code has to be string")
+
 
 def list_tables():
     with get_connection() as conn:
@@ -147,11 +159,12 @@ def list_tables():
 
     print(tables)
 
+
 def create_listings_table():
     with get_connection() as conn:
         c = conn.cursor()
 
-        c.execute('''
+        c.execute("""
             CREATE TABLE IF NOT EXISTS listings (
                 site TEXT,
                 id INT UNIQUE NOT NULL,
@@ -177,13 +190,14 @@ def create_listings_table():
 
                 PRIMARY KEY (site, id)
             )
-        ''')
+        """)
+
 
 def create_enriched_laptops_table():
     with get_connection() as conn:
         c = conn.cursor()
 
-        c.execute('''
+        c.execute("""
             CREATE TABLE IF NOT EXISTS enriched_laptops (
                 site TEXT NOT NULL,
                 listing_id INT NOT NULL,
@@ -207,13 +221,14 @@ def create_enriched_laptops_table():
                     REFERENCES listings(site, id)
                     ON DELETE CASCADE
             )
-        ''')
+        """)
+
 
 def create_enriched_gpus_table():
     with get_connection() as conn:
         c = conn.cursor()
 
-        c.execute('''
+        c.execute("""
             CREATE TABLE IF NOT EXISTS enriched_gpus (
                 site TEXT NOT NULL,
                 listing_id INT NOT NULL,
@@ -226,13 +241,14 @@ def create_enriched_gpus_table():
                     REFERENCES listings(site, id)
                     ON DELETE CASCADE
             )
-        ''')
+        """)
+
 
 def create_searches_table():
     with get_connection() as conn:
         c = conn.cursor()
 
-        c.execute('''
+        c.execute("""
             CREATE TABLE IF NOT EXISTS searches(
                 search_id INTEGER PRIMARY KEY,  
                 email TEXT NOT NULL,
@@ -241,13 +257,14 @@ def create_searches_table():
                 filters TEXT NOT NULL,
                 is_active BOOLEAN
             )
-        ''')
+        """)
+
 
 def create_laptop_view():
     with get_connection() as conn:
         c = conn.cursor()
 
-        c.execute('''
+        c.execute("""
             CREATE VIEW IF NOT EXISTS laptop_view AS
             SELECT 
                 l.site,
@@ -286,13 +303,14 @@ def create_laptop_view():
             JOIN enriched_laptops e
             ON l.site = e.site AND l.id = e.listing_id
             WHERE l.product_type = 'Notebook';
-        ''')
+        """)
+
 
 def create_gpu_view():
     with get_connection() as conn:
         c = conn.cursor()
 
-        c.execute('''
+        c.execute("""
             CREATE VIEW IF NOT EXISTS gpu_view AS
             SELECT 
                 l.site,
@@ -321,7 +339,8 @@ def create_gpu_view():
             JOIN enriched_gpus e
             ON l.site = e.site AND l.id = e.listing_id
             WHERE json_extract(l.category, '$[2]') = 'Videokártya';
-        ''')
+        """)
+
 
 def get_verification_queue_listings():
     """Get all non-archived listings from the verification queue."""
@@ -336,19 +355,27 @@ def get_verification_queue_listings():
             """)
             rows = c.fetchall()
             return [dict(row) for row in rows]
-        except Exception as e:
-            raise RuntimeError(f"\033[91m[DB ERROR] Failed to fetch verification queue: {e}\033[0m")
+        except sqlite3.Error as e:
+            raise RuntimeError(
+                f"\033[91m[DB ERROR] Failed to fetch verification queue: {e}\033[0m"
+            )
+
 
 def get_connection():
     try:
         if not os.path.exists(DATABASE_PATH):
-            raise FileNotFoundError(f"\033[91mDatabase not found at {DATABASE_PATH}\033[0m")
-        
+            raise FileNotFoundError(
+                f"\033[91mDatabase not found at {DATABASE_PATH}\033[0m"
+            )
+
         conn = sqlite3.connect(DATABASE_PATH)
         conn.row_factory = sqlite3.Row
         return conn
     except sqlite3.Error as e:
-        raise RuntimeError(f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m")
+        raise RuntimeError(
+            f"\033[91m[DB ERROR] Failed to connect to database: {e}\033[0m"
+        )
+
 
 def main():
     # drop laptop view and create it again

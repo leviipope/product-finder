@@ -1,16 +1,18 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from typing import Annotated
+
 from app.database import get_db
 from app.schemas.search import SearchCreate, SearchFilterParams, SearchResponse
 from app.services import search_service
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/searches", tags=["Searches"])
 
 
 @router.get("/", response_model=list[SearchResponse])
 def read_searches(
-    filters: SearchFilterParams = Depends(),
-    db: Session = Depends(get_db)
+    filters: Annotated[SearchFilterParams, Depends()],
+    db: Annotated[Session, Depends(get_db)],
 ):
     """
     Fetch paginated searches based on user search parameters.
@@ -19,11 +21,9 @@ def read_searches(
     """
     return search_service.get_searches(db, filters)
 
+
 @router.post("/", response_model=SearchResponse)
-def create_search(
-    search_data: SearchCreate,
-    db: Session = Depends(get_db)
-):
+def create_search(search_data: SearchCreate, db: Annotated[Session, Depends(get_db)]):
     """
     Create a new search entry.
 
@@ -34,11 +34,9 @@ def create_search(
     """
     return search_service.create_search(db, search_data)
 
+
 @router.delete("/{search_id}", status_code=204)
-def delete_search(
-    search_id: int,
-    db: Session = Depends(get_db)
-):
+def delete_search(search_id: int, db: Annotated[Session, Depends(get_db)]):
     """
     Delete a search entry by its ID.
 
@@ -46,11 +44,9 @@ def delete_search(
     """
     search_service.delete_search(db, search_id)
 
+
 @router.patch("/{search_id}/activate", status_code=204)
-def activate_search(
-    search_id: int,
-    db: Session = Depends(get_db)
-):
+def activate_search(search_id: int, db: Annotated[Session, Depends(get_db)]):
     """
     Activate a search entry by its ID.
 
@@ -58,11 +54,9 @@ def activate_search(
     """
     search_service.activate_search(db, search_id)
 
+
 @router.patch("/{search_id}/deactivate", status_code=204)
-def deactivate_search(
-    search_id: int,
-    db: Session = Depends(get_db)
-):
+def deactivate_search(search_id: int, db: Annotated[Session, Depends(get_db)]):
     """
     Deactivate a search entry by its ID.
 

@@ -1,0 +1,19 @@
+[project]
+name = "product-finder"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.141.1",
+    "ollama>=0.6.2",
+    "ruff>=0.16.6",
+    "scrapy>=2.18.0",
+    "yagmail>=0.16.0",
+]
+
+[tool.ruff]
+lint.extend-select = [
+    "FAST",
+    
+]
