@@ -8,15 +8,51 @@
 
 
 # useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
+import json
+import sys
 from datetime import datetime
 from pathlib import Path
-import sys
-import json
+
+from itemadapter import ItemAdapter
+from scrapy.exceptions import DropItem
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 import db
+
+
+class CheckIfForbiddenCategoryPipeline:
+    def process_item(self, item, spider):
+        if spider.name != "hardver":
+            return item
+
+        adapter = ItemAdapter(item)
+        spider.logger.info(
+            f"\033[92mCheckIfForbiddenCategoryPipeline: Processing item {adapter['id']}\033[0m"
+        )
+
+        category = adapter.get("category")
+        if isinstance(category, str) and category.endswith(
+            "_marked_as_forbidden_category"
+        ):
+            id = adapter.get("id")
+            if id is not None:
+                try:
+                    id_int = int(id)
+                    original_category = category.replace(
+                        "_marked_as_forbidden_category", ""
+                    )
+                    db.add_to_cache(id_int, "forbidden_category: " + original_category)
+                    spider.logger.info(
+                        f"\033[93mCheckIfForbiddenCategoryPipeline: Added ID {id_int} to cache for forbidden category.\033[0m"
+                    )
+                    raise DropItem(f"Listing {id_int} is in a forbidden category")
+                except ValueError:
+                    spider.logger.warning(
+                        f"\033[91mCheckIfForbiddenCategoryPipeline: Invalid ID {id} for forbidden category.\033[0m"
+                    )
+
+        return item
 
 
 class CleanDataPipeline:
@@ -25,53 +61,69 @@ class CleanDataPipeline:
             return item
 
         adapter = ItemAdapter(item)
-        spider.logger.info(f"\033[92mCleanDataPipeline: Processing item {adapter['id']}\033[0m")
+        spider.logger.info(
+            f"\033[92mCleanDataPipeline: Processing item {adapter['id']}\033[0m"
+        )
 
-        if adapter.get('id') is not None:
-            adapter['id'] = int(adapter['id'])
+        if adapter.get("id") is not None:
+            adapter["id"] = int(adapter["id"])
 
-        if adapter.get('listed_at'):
-            listed_at = adapter.get('listed_at')
+        if adapter.get("listed_at"):
+            listed_at = adapter.get("listed_at")
             try:
                 if isinstance(listed_at, str):
-                    adapter['listed_at'] = datetime.strptime(listed_at.strip(), "%Y-%m-%d %H:%M")
+                    adapter["listed_at"] = datetime.strptime(
+                        listed_at.strip(), "%Y-%m-%d %H:%M"
+                    )
             except Exception as e:
-                spider.logger.warning(f"Failed to convert date: {listed_at}. Error: {e}")
+                spider.logger.warning(
+                    f"Failed to convert date: {listed_at}. Error: {e}"
+                )
 
-        if spider.name == 'hardver':
-            if adapter.get('title'):
-                title = adapter.get('title')
-                adapter['title'] = title[:-len(" - HardverApró")] # type: ignore
+        if spider.name == "hardver":
+            if adapter.get("title"):
+                title = adapter.get("title")
+                adapter["title"] = title[: -len(" - HardverApró")]  # type: ignore
 
-            if adapter.get('price'):
-                price_str = adapter.get('price')
+            if adapter.get("price"):
+                price_str = adapter.get("price")
                 if isinstance(price_str, str):
-                    cleaned_price = price_str.replace('\xa0', '').replace(' ', '').replace('Ft', '').strip()
-                    if 'M' in cleaned_price:
-                        cleaned_price = cleaned_price.replace('M', '')
+                    cleaned_price = (
+                        price_str.replace("\xa0", "")
+                        .replace(" ", "")
+                        .replace("Ft", "")
+                        .strip()
+                    )
+                    if "M" in cleaned_price:
+                        cleaned_price = cleaned_price.replace("M", "")
                         try:
-                            price_value = float(cleaned_price.replace(',', '.')) * 1_000_000
+                            price_value = (
+                                float(cleaned_price.replace(",", ".")) * 1_000_000
+                            )
                             cleaned_price = str(int(price_value))
                         except ValueError:
-                            spider.logger.warning(f"Could not convert price with M: {price_str}")
+                            spider.logger.warning(
+                                f"Could not convert price with M: {price_str}"
+                            )
                     try:
-                        adapter['price'] = int(cleaned_price)
+                        adapter["price"] = int(cleaned_price)
                     except ValueError:
                         spider.logger.warning(f"Could not convert price: {price_str}")
 
-            if adapter.get('category'):
-                category = adapter.get('category')
+            if adapter.get("category"):
+                category = adapter.get("category")
                 if isinstance(category, str):
-                    adapter['category'] = category.replace("/ ", "").strip().split("/")
+                    adapter["category"] = category.replace("/ ", "").strip().split("/")
 
-            if adapter.get('img'):
-                img = adapter.get('img')
+            if adapter.get("img"):
+                img = adapter.get("img")
                 if isinstance(img, str):
                     if img.endswith("/100"):
-                        adapter['img'] = img[:-4]
+                        adapter["img"] = img[:-4]
 
         return item
-    
+
+
 class SQLitePipeline:
     MINIMUM_EXPECTED_ITEMS = 2000
 
@@ -81,21 +133,25 @@ class SQLitePipeline:
         self.cursor = self.conn.cursor()
         self.active_listings = {}
         self.latest_prices = {}
-    
+
     def opened_spider(self, spider):
         if spider.name == "hardver":
             self.active_listings = spider.active_listings
             self.latest_prices = spider.latest_prices
 
     def _ensure_verification_table(self):
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS verification_queue (id INTEGER PRIMARY KEY)")
+        self.cursor.execute(
+            "CREATE TABLE IF NOT EXISTS verification_queue (id INTEGER PRIMARY KEY)"
+        )
         self.cursor.execute("DELETE FROM verification_queue")
 
     def _insert_missing_ids(self, missing_ids):
         if not missing_ids:
             return
         tuples = [(int(i),) for i in missing_ids]
-        self.cursor.executemany("INSERT INTO verification_queue (id) VALUES (?)", tuples)
+        self.cursor.executemany(
+            "INSERT INTO verification_queue (id) VALUES (?)", tuples
+        )
         self.conn.commit()
 
     def _close_connection(self):
@@ -120,9 +176,13 @@ class SQLitePipeline:
             try:
                 self.cursor.execute(query, (archived_at, id))
                 self.conn.commit()
-                spider.logger.info(f"\033[38;5;21mSQLitePipeline: Item {id} archived successfully.\033[0m")
+                spider.logger.info(
+                    f"\033[38;5;21mSQLitePipeline: Item {id} archived successfully.\033[0m"
+                )
             except Exception as e:
-                spider.logger.error(f"\033[91mSQLitePipeline: Failed to archive item {id}: {e}\033[0m")
+                spider.logger.error(
+                    f"\033[91mSQLitePipeline: Failed to archive item {id}: {e}\033[0m"
+                )
 
             return item
 
@@ -145,22 +205,32 @@ class SQLitePipeline:
         if is_iced_update or is_price_update:
             if is_iced_update:
                 iced_status_int = 1 if adapter.get("iced_status") else 0
-                iced_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if iced_status_int else None
+                iced_at = (
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    if iced_status_int
+                    else None
+                )
                 query = "UPDATE listings SET iced_status = ?, iced_at = ? WHERE id = ?"
                 values = [iced_status_int, iced_at, id]
 
                 try:
                     self.cursor.execute(query, values)
                     self.conn.commit()
-                    spider.logger.info(f"\033[38;5;153mSQLitePipeline: Iced status updated successfully {id}\033[0m")
+                    spider.logger.info(
+                        f"\033[38;5;153mSQLitePipeline: Iced status updated successfully {id}\033[0m"
+                    )
                 except Exception as e:
-                    spider.logger.error(f"\033[91mSQLitePipeline: Failed to update iced status: {id}, {e}\033[0m")
+                    spider.logger.error(
+                        f"\033[91mSQLitePipeline: Failed to update iced status: {id}, {e}\033[0m"
+                    )
 
             if is_price_update:
                 old_price = self.latest_prices.get(id)
-                new_price = adapter['price']
+                new_price = adapter["price"]
 
-                self.cursor.execute("SELECT price_history FROM listings WHERE id = ?", (id,))
+                self.cursor.execute(
+                    "SELECT price_history FROM listings WHERE id = ?", (id,)
+                )
                 row = self.cursor.fetchone()
                 if row:
                     price_history = json.loads(row["price_history"] or "[]")
@@ -177,12 +247,16 @@ class SQLitePipeline:
                 try:
                     self.cursor.execute(query, values)
                     self.conn.commit()
-                    spider.logger.info(f"\033[38;5;153mSQLitePipeline: Price updated successfully {id}\033[0m")
+                    spider.logger.info(
+                        f"\033[38;5;153mSQLitePipeline: Price updated successfully {id}\033[0m"
+                    )
                 except Exception as e:
-                    spider.logger.error(f"\033[91mSQLitePipeline: Failed to update price: {id}, {e}\033[0m")
-                
-            return item    
-            
+                    spider.logger.error(
+                        f"\033[91mSQLitePipeline: Failed to update price: {id}, {e}\033[0m"
+                    )
+
+            return item
+
         columns, placeholders, values = [], [], []
 
         for field in adapter.keys():
@@ -202,19 +276,34 @@ class SQLitePipeline:
         else:
             pass
 
-        query = f"INSERT INTO listings ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
+        query = f"""
+            INSERT INTO listings ({", ".join(columns)})
+            VALUES ({", ".join(placeholders)})
+            ON CONFLICT(site, id) DO NOTHING
+        """
         try:
             self.cursor.execute(query, values)
             self.conn.commit()
-            spider.logger.debug(f"\033[94mSQLitePipeline: Item {id} inserted successfully\033[0m")
+            if self.cursor.rowcount:
+                spider.logger.debug(
+                    f"\033[94mSQLitePipeline: Item {id} inserted successfully\033[0m"
+                )
+            else:
+                spider.logger.info(
+                    f"\033[38;5;215mSQLitePipeline: Item {id} already exists; skipping duplicate insert\033[0m"
+                )
         except Exception as e:
-            spider.logger.error(f"\033[91mSQLitePipeline: Failed to insert Item {id}: {e}\033[0m")
+            spider.logger.error(
+                f"\033[91mSQLitePipeline: Failed to insert Item {id}: {e}\033[0m"
+            )
 
         return item
-    
+
     def close_spider(self, spider):
         if spider.name != "hardver":
-            spider.logger.info(f"\033[94mSQLitePipeline: Closing Spider {spider.name}...\033[0m")
+            spider.logger.info(
+                f"\033[94mSQLitePipeline: Closing Spider {spider.name}...\033[0m"
+            )
             self._close_connection()
             return
 
@@ -232,11 +321,15 @@ class SQLitePipeline:
         self._ensure_verification_table()
 
         if not missing_ids:
-            spider.logger.info(f"\033[38;5;82m[INFO] No missing IDs found. Database is up to date.\033[0m")
+            spider.logger.info(
+                f"\033[38;5;82m[INFO] No missing IDs found. Database is up to date.\033[0m"
+            )
             self._close_connection()
             return
 
-        spider.logger.info(f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Scraped from {len(getattr(spider, 'categories_scraped', []))} categories.\033[0m")
+        spider.logger.info(
+            f"\033[94m[PROCESS] Found {len(missing_ids)} missing IDs. Scraped from {len(getattr(spider, 'categories_scraped', []))} categories.\033[0m"
+        )
 
         self._insert_missing_ids(missing_ids)
         self._close_connection()

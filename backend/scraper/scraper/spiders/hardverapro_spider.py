@@ -1,13 +1,16 @@
-import scrapy
-from scraper.items import ScraperItem
-from datetime import datetime
 import sys
+from datetime import datetime
 from pathlib import Path
+
+import scrapy
+
+from scraper.items import ScraperItem
 
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from backend.db import get_active_listing_ids, get_latest_prices
+from backend.db import get_active_listing_ids, get_cached_listing_ids, get_latest_prices
+
 
 class HardverSpider(scrapy.Spider):
     name = "hardver"
@@ -17,14 +20,14 @@ class HardverSpider(scrapy.Spider):
     ]
 
     custom_settings = {
-        'DOWNLOAD_DELAY': 0.2,
-        'CONCURRENT_REQUESTS_PER_DOMAIN': 2,
-        'ROBOTSTXT_OBEY': False,
-        'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'COOKIES_ENABLED': False,
-        'AUTOTHROTTLE_ENABLED': True,
-        'AUTOTHROTTLE_START_DELAY': 0.5,
-        'AUTOTHROTTLE_TARGET_CONCURRENCY': 2.0,
+        "DOWNLOAD_DELAY": 0.2,
+        "CONCURRENT_REQUESTS_PER_DOMAIN": 2,
+        "ROBOTSTXT_OBEY": False,
+        "USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "COOKIES_ENABLED": False,
+        "AUTOTHROTTLE_ENABLED": True,
+        "AUTOTHROTTLE_START_DELAY": 0.5,
+        "AUTOTHROTTLE_TARGET_CONCURRENCY": 2.0,
     }
 
     def __init__(self, *args, **kwargs):
@@ -33,36 +36,77 @@ class HardverSpider(scrapy.Spider):
         self.latest_prices = get_latest_prices(list(self.active_listings.keys()))
         self.seen_ids = set()
         self.categories_scraped = set()
+        self.id_cache = get_cached_listing_ids()
 
     def parse(self, response):
         breadcrumb = response.css("ol.breadcrumb")
-        breadcrumb_text = breadcrumb.xpath('string(.)').get()
+        breadcrumb_text = breadcrumb.xpath("string(.)").get()
         if breadcrumb_text:
-            breadcrumb_text = breadcrumb_text.replace("\t", " ").replace("\n", " ").strip()
+            breadcrumb_text = (
+                breadcrumb_text.replace("\t", " ").replace("\n", " ").strip()
+            )
             parts = breadcrumb_text.split()
             if len(parts) >= 2:
                 product_type = parts[1]
                 self.categories_scraped.add(product_type)
-                self.logger.info(f"\033[92mDEBUG: Added category: {product_type}\033[0m")
+                self.logger.info(
+                    f"\033[92mDEBUG: Added category: {product_type}\033[0m"
+                )
 
-        listings = response.css('ul.list-unstyled > li[class]')
+        listings = response.css("ul.list-unstyled > li[class]")
 
         for listing in listings:
-            data_uadid = listing.attrib.get('data-uadid')
+            data_uadid = listing.attrib.get("data-uadid")
+
+            if data_uadid in self.seen_ids:
+                self.logger.info(
+                    f"\033[38;5;153mSkipping cached item: current scrape id: {data_uadid}, cached id: {data_uadid}, cache reason: {self.id_cache.get(data_uadid, 'unknown')}\033[0m"
+                )
+                continue
+
             self.seen_ids.add(data_uadid)
 
             if listing.css("div[class='uad-corner-ribbon uad-corner-ribbon-bazaar']"):
-                self.logger.info(f"\033[38;5;153mSkipping bazaar item: {listing.attrib.get('data-uadid')}\033[0m")
+                self.logger.info(
+                    f"\033[38;5;153mSkipping bazaar item: {listing.attrib.get('data-uadid')}\033[0m"
+                )
                 continue
 
-            title = listing.css("div[class='uad-col uad-col-title'] > h1 > a::text").get().lower()
-            if title and any(keyword in title.lower() for keyword in 
-                             ["folyamatosan frissül", "tisztítás", "pasztázás", "xx", "xxx", "csere", "hibás", "javítás", "új és használt", "licencek", "bazár",
-                              "karbantartás", "szervíz", "szerviz", "csomag", "támasztékok", "töltő", "tolto", "mining", "bányász"]
-                             ):
+            title = (
+                listing.css("div[class='uad-col uad-col-title'] > h1 > a::text")
+                .get()
+                .lower()
+            )
+            if title and any(
+                keyword in title.lower()
+                for keyword in [
+                    "folyamatosan frissül",
+                    "tisztítás",
+                    "pasztázás",
+                    "xx",
+                    "xxx",
+                    "csere",
+                    "hibás",
+                    "javítás",
+                    "új és használt",
+                    "licencek",
+                    "bazár",
+                    "karbantartás",
+                    "szervíz",
+                    "szerviz",
+                    "csomag",
+                    "támasztékok",
+                    "töltő",
+                    "tolto",
+                    "mining",
+                    "bányász",
+                ]
+            ):
                 continue
 
-            iced_status = listing.css("div[class='uad-col uad-col-price'] div::attr(class)").get()
+            iced_status = listing.css(
+                "div[class='uad-col uad-col-price'] div::attr(class)"
+            ).get()
             if iced_status == "uad-price uad-price-iced":
                 iced_status = True
             elif iced_status == "uad-price":
@@ -73,14 +117,21 @@ class HardverSpider(scrapy.Spider):
                 continue
 
             if data_uadid in self.active_listings:
-                clean_price = price.replace('\xa0', '').replace(' ', '').replace('Ft', '').strip()
+                clean_price = (
+                    price.replace("\xa0", "").replace(" ", "").replace("Ft", "").strip()
+                )
                 try:
-                    if 'M' in clean_price:
-                        current_price = int(float(clean_price.replace('M', '').replace(',', '.')) * 1_000_000)
+                    if "M" in clean_price:
+                        current_price = int(
+                            float(clean_price.replace("M", "").replace(",", "."))
+                            * 1_000_000
+                        )
                     else:
                         current_price = int(clean_price)
                 except ValueError:
-                    self.logger.warning(f"Could not parse price for item {data_uadid}: '{price}'")
+                    self.logger.warning(
+                        f"Could not parse price for item {data_uadid}: '{price}'"
+                    )
                     continue
 
                 latest_price_in_db = self.latest_prices.get(str(data_uadid))
@@ -90,29 +141,37 @@ class HardverSpider(scrapy.Spider):
                 iced_status_changed = iced_status != iced_status_in_db
 
                 if price_changed or iced_status_changed:
-                    self.logger.info(f"\033[38;5;153mSending item as iced item or price update item: {data_uadid}\033[0m")
+                    self.logger.info(
+                        f"\033[38;5;153mSending item as iced item or price update item: {data_uadid}\033[0m"
+                    )
                     yield {
-                        'id': data_uadid,
-                        'iced_status': iced_status,
-                        'price': price,
+                        "id": data_uadid,
+                        "iced_status": iced_status,
+                        "price": price,
                     }
                 else:
-                    self.logger.info(f"\033[38;5;215mSkipping because no change: {data_uadid} (this item will not go to any pipeline)\033[0m")
-                
+                    self.logger.info(
+                        f"\033[38;5;215mSkipping because no change: {data_uadid} (this item will not go to any pipeline)\033[0m"
+                    )
+
                 continue
 
-            img = listing.css("div[class='uad-col uad-col-image'] > a > img::attr(src)").get()
-            product_url = listing.css("div[class='uad-col uad-col-title'] > h1 > a::attr(href)").get()
+            img = listing.css(
+                "div[class='uad-col uad-col-image'] > a > img::attr(src)"
+            ).get()
+            product_url = listing.css(
+                "div[class='uad-col uad-col-title'] > h1 > a::attr(href)"
+            ).get()
 
             yield response.follow(
                 product_url,
                 callback=self.parse_product,
                 meta={
-                    'data_uadid': data_uadid,
-                    'iced_status': iced_status,
-                    'price': price,
-                    'img': img,
-                }
+                    "data_uadid": data_uadid,
+                    "iced_status": iced_status,
+                    "price": price,
+                    "img": img,
+                },
             )
 
         next_page = response.css('li.nav-arrow a[rel="next"]::attr(href)').get()
@@ -120,56 +179,84 @@ class HardverSpider(scrapy.Spider):
             yield response.follow(next_page, self.parse)
 
     def parse_product(self, response):
-        data_uadid = response.meta.get('data_uadid')
-        iced_status = response.meta.get('iced_status')
-        price = response.meta.get('price')
-        img = response.meta.get('img')
+        data_uadid = response.meta.get("data_uadid")
+        iced_status = response.meta.get("iced_status")
+        price = response.meta.get("price")
+        img = response.meta.get("img")
 
-        title = response.css('head title::text').get()
+        title = response.css("head title::text").get()
 
         category_div = response.css("div.container > div > ol.breadcrumb")
-        category_text = category_div.xpath('string(.)').get().replace("\t", " ").replace("\n", " ").replace("  ", " ").replace("  ", "/").strip()
-        if any(keyword in category_text.lower() for keyword in ["tartozék", "alkatrész"]):
+        category_text = (
+            category_div.xpath("string(.)")
+            .get()
+            .replace("\t", " ")
+            .replace("\n", " ")
+            .replace("  ", " ")
+            .replace("  ", "/")
+            .strip()
+        )
+        if any(
+            keyword in category_text.lower() for keyword in ["tartozék", "alkatrész"]
+        ):
             if data_uadid in self.seen_ids:
                 self.seen_ids.remove(data_uadid)
-            self.logger.info(f"\033[38;5;226mSkipping item {data_uadid} because it is in a forbidden category: {category_text}\033[0m")
+            self.logger.info(
+                f"\033[38;5;226mAdding item {data_uadid} to cache table as it is in a forbidden category: {category_text}\033[0m"
+            )
+
+            scraper_item = ScraperItem()
+
+            scraper_item["site"] = "HardverApró"
+            scraper_item["category"] = category_text + "_marked_as_forbidden_category"
+            scraper_item["id"] = data_uadid
+
+            yield scraper_item
             return
 
-        seller = response.css('td > b > a[style][href]::text').get()
-        seller_profile_url_relativ = response.css('td > b > a[style][href]::attr(href)').get()
+        seller = response.css("td > b > a[style][href]::text").get()
+        seller_profile_url_relativ = response.css(
+            "td > b > a[style][href]::attr(href)"
+        ).get()
         seller_profile_url_absolute = response.urljoin(seller_profile_url_relativ)
         seller_rating_div = response.css("a[class='uad-rating-link']")
-        seller_rating = seller_rating_div.xpath('string(.)').get()
+        seller_rating = seller_rating_div.xpath("string(.)").get()
 
         location_delivery_div = response.css("div[class='uad-time-location']")
-        location_delivery_data = location_delivery_div.xpath('string(.)').get()
-        location_delivery_data = location_delivery_data.split('\n\t\t\t\t\n\t\t\t\t\n\t\t\t\t\t\n\t\t\t\t\t')
+        location_delivery_data = location_delivery_div.xpath("string(.)").get()
+        location_delivery_data = location_delivery_data.split(
+            "\n\t\t\t\t\n\t\t\t\t\n\t\t\t\t\t\n\t\t\t\t\t"
+        )
         location = location_delivery_data[0].replace("\n", "").replace("\t", "").strip()
-        delivery_options = location_delivery_data[1].replace("\n", "").replace("\t", "").strip()
+        delivery_options = (
+            location_delivery_data[1].replace("\n", "").replace("\t", "").strip()
+        )
 
-        listed_at = response.css('span[title][data-toggle="tooltip"]::text').get().strip()
+        listed_at = (
+            response.css('span[title][data-toggle="tooltip"]::text').get().strip()
+        )
 
-        description_div = response.css('div.uad-content div.rtif-content')
-        description_text = description_div.xpath('string(.)').get()
+        description_div = response.css("div.uad-content div.rtif-content")
+        description_text = description_div.xpath("string(.)").get()
 
         scraper_item = ScraperItem()
 
-        scraper_item['site'] = "HardverApró"
-        scraper_item['category'] = category_text
-        scraper_item['id'] = data_uadid
-        scraper_item['iced_status'] = iced_status
-        scraper_item['price'] = price
-        scraper_item['img'] = img
-        scraper_item['currency'] = "HUF"
-        scraper_item['title'] = title
-        scraper_item['seller'] = seller
-        scraper_item['seller_rating'] = seller_rating
-        scraper_item['seller_profile_url'] = seller_profile_url_absolute
-        scraper_item['location'] = location
-        scraper_item['delivery_options'] = delivery_options
-        scraper_item['listed_at'] = listed_at
-        scraper_item['listing_url'] = response.url
-        scraper_item['description'] = description_text
-        scraper_item['scraped_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        scraper_item["site"] = "HardverApró"
+        scraper_item["category"] = category_text
+        scraper_item["id"] = data_uadid
+        scraper_item["iced_status"] = iced_status
+        scraper_item["price"] = price
+        scraper_item["img"] = img
+        scraper_item["currency"] = "HUF"
+        scraper_item["title"] = title
+        scraper_item["seller"] = seller
+        scraper_item["seller_rating"] = seller_rating
+        scraper_item["seller_profile_url"] = seller_profile_url_absolute
+        scraper_item["location"] = location
+        scraper_item["delivery_options"] = delivery_options
+        scraper_item["listed_at"] = listed_at
+        scraper_item["listing_url"] = response.url
+        scraper_item["description"] = description_text
+        scraper_item["scraped_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         yield scraper_item

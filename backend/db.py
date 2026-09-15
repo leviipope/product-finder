@@ -8,6 +8,25 @@ db_path = os.path.abspath(db_path)
 DATABASE_PATH = db_path
 
 
+def get_cached_listing_ids() -> dict[str, str]:
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT listing_id, cache_reason FROM cache")
+        results = c.fetchall()
+
+        return {str(row["listing_id"]): row["cache_reason"] for row in results}
+
+
+def add_to_cache(listing_id, cache_reason):
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute(
+            "INSERT OR IGNORE INTO cache (listing_id, cache_reason) VALUES (?, ?)",
+            (listing_id, cache_reason),
+        )
+        conn.commit()
+
+
 def get_active_listing_ids():
     with get_connection() as conn:
         c = conn.cursor()
@@ -62,7 +81,7 @@ def get_latest_price(id):
         c.execute("SELECT price FROM listings WHERE id = ?", (id,))
         row = c.fetchone()
 
-        if row is None:
+        if row is None or row[0] is None:
             return None
 
         return int(row[0])
@@ -75,7 +94,11 @@ def get_latest_prices(ids):
     with get_connection() as conn:
         c = conn.cursor()
         placeholders = ", ".join("?" for _ in ids)
-        query = f"SELECT id, price FROM listings WHERE id IN ({placeholders})"
+        query = f"""
+            SELECT id, price
+            FROM listings
+            WHERE id IN ({placeholders}) AND price IS NOT NULL
+        """
         c.execute(query, ids)
         results = c.fetchall()
 
@@ -260,6 +283,18 @@ def create_searches_table():
         """)
 
 
+def create_cache_table():
+    with get_connection() as conn:
+        c = conn.cursor()
+
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS cache(
+                listing_id INTEGER PRIMARY KEY,
+                cache_reason TEXT
+            )
+        """)
+
+
 def create_laptop_view():
     with get_connection() as conn:
         c = conn.cursor()
@@ -378,16 +413,7 @@ def get_connection():
 
 
 def main():
-    # drop laptop view and create it again
-    with get_connection() as conn:
-        c = conn.cursor()
-        c.execute("DROP VIEW IF EXISTS laptop_view")
-        create_laptop_view()
-        print("✅ Laptop view created successfully")
-
-        c.execute("DROP VIEW IF EXISTS gpu_view")
-        create_gpu_view()
-        print("✅ GPU view created successfully")
+    pass
 
 
 if __name__ == "__main__":
