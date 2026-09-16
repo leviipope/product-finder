@@ -41,6 +41,8 @@ def get_enriched_laptop_listings(
 ) -> list[EnrichedLaptopListing]:
     stmt = select(EnrichedLaptopListing)
 
+    if not params.include_archived:
+        stmt = stmt.where(EnrichedLaptopListing.archived_at.is_(None))
     if params.site:
         stmt = stmt.where(EnrichedLaptopListing.site == params.site)
     if params.brand:
@@ -122,6 +124,8 @@ def get_enriched_gpu_listings(
 ) -> list[EnrichedGPUListing]:
     stmt = select(EnrichedGPUListing)
 
+    if not params.include_archived:
+        stmt = stmt.where(EnrichedGPUListing.archived_at.is_(None))
     if params.site:
         stmt = stmt.where(EnrichedGPUListing.site == params.site)
     if params.brand:

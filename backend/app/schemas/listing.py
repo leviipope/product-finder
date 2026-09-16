@@ -57,6 +57,7 @@ class EnrichedLaptopFilterParams(BaseModel):
     min_refresh_rate_hz: int | None = None
     max_refresh_rate_hz: int | None = None
     location: str | None = None
+    include_archived: bool = False
     skip: int = 0
     limit: int = 20
 
@@ -115,14 +116,9 @@ class EnrichedLaptopListingBrowseResponse(BaseModel):
     price: int | None
     currency: str
     iced_status: bool
-    cpu_brand: str | None
-    cpu_model: str | None
-    gpu_brand: str | None
-    gpu_model: str | None
-    ram_gb: int | None
-    storage_size_gb: int | None
-    resolution: str | None
-    refresh_rate_hz: int | None
+    archived_at: datetime | None
+    img_url: str | None
+    location: str
 
 
 class EnrichedGPUListingFilterParams(BaseModel):
@@ -134,6 +130,7 @@ class EnrichedGPUListingFilterParams(BaseModel):
     min_vram_gb: int | None = None
     max_vram_gb: int | None = None
     iced_status: bool | None = None
+    include_archived: bool = False
     skip: int = 0
     limit: int = 20
 
@@ -172,3 +169,6 @@ class EnrichedGPUListingBrowseResponse(BaseModel):
     price: int | None
     currency: str
     iced_status: bool
+    archived_at: datetime | None
+    img_url: str | None
+    location: str

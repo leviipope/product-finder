@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.141.1",
     "ollama>=0.6.2",
+    "pydantic>=2.13.5",
     "ruff>=0.16.6",
     "scrapy>=2.18.0",
     "yagmail>=0.16.0",
